@@ -12,10 +12,10 @@ BASE_URL = "https://api.siliconflow.cn/v1"
 # 索引顺序：0=主持人，1~5=五位成员
 # 你可以根据需求替换为硅基流动支持的其他模型
 MODELS = [
-    "Qwen/Qwen2.5-Coder-7B-Instruct",      # 主持人（较强模型）
-    "Qwen/Qwen2.5-Coder-7B-Instruct",       
-    "Qwen/Qwen2.5-Coder-7B-Instruct",      
-    "Qwen/Qwen2.5-Coder-7B-Instruct"    
+    "Qwen/Qwen2.5-VL-32B-Instruct",      # 主持人（较强模型）
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",       
+    "Qwen/Qwen2.5-14B-Instruct",      
+    "Qwen/Qwen3-14B"    
 ]
 
 
