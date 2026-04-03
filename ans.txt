@@ -1,38 +1,60 @@
-#include <iostream>
-#include <string>
-#include <algorithm>
-
+#include <bits/stdc++.h>
 using namespace std;
 
-string highPrecisionAdd(string a, string b) {
-    while (a.length() > 1 && a[0] == '0') a.erase(a.begin());
-    while (b.length() > 1 && b[0] == '0') b.erase(b.begin());
-
-    if (a.length() < b.length()) swap(a, b);
-
-    b.insert(0, a.length() - b.length(), '0');
-
-    string result;
-    int carry = 0;
-
-    for (int i = a.length() - 1; i >= 0; --i) {
-        int sum = (a[i] - '0') + (b[i] - '0') + carry;
-        result.push_back(sum % 10 + '0');
-        carry = sum / 10;
+bool canPair(const string& a, const string& b) {
+    if (a == b) return true;
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); i++) {
+        if (a[i] != b[a.size() - 1 - i]) return false;
     }
-
-    if (carry > 0) result.push_back(carry + '0');
-
-    reverse(result.begin(), result.end());
-
-    while (result.length() > 1 && result[0] == '0') result.erase(result.begin());
-
-    return result;
+    return true;
 }
 
 int main() {
-    string a, b;
-    cin >> a >> b;
-    cout << highPrecisionAdd(a, b) << endl;
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    
+    string S;
+    if (!(cin >> S)) return 0;
+    
+    int n = S.size();
+    int L = 0, R = n - 1;
+    int pairs = 0;
+    
+    while (L < R) {
+        bool found = false;
+        for (int i = L; i < R; i++) {
+            string SL = S.substr(L, i - L + 1);
+            for (int j = R; j > i; j--) {
+                string SR = S.substr(j, R - j + 1);
+                if (canPair(SL, SR)) {
+                    L = i + 1;
+                    R = j - 1;
+                    pairs++;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+        if (!found) {
+            cout << "NO" << endl;
+            return 0;
+        }
+    }
+    
+    int total = pairs * 2;
+    if (L == R) {
+        total++;
+    }
+    
+    if (total <= 1) {
+        cout << "NO" << endl;
+        return 0;
+    }
+    
+    cout << "YES" << endl;
+    cout << total << endl;
+    
     return 0;
 }

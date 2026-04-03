@@ -12,17 +12,17 @@ BASE_URL = "https://api.siliconflow.cn/v1"
 # 索引顺序：0=主持人，1~5=五位成员
 # 你可以根据需求替换为硅基流动支持的其他模型
 MODELS = [
-    "Qwen/Qwen2.5-VL-32B-Instruct",      # 主持人（较强模型）
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",       
-    "Qwen/Qwen2.5-14B-Instruct",      
-    "Qwen/Qwen3-14B"    
+    "deepseek-ai/DeepSeek-V3",      # 主持人（较强模型）
+    "deepseek-ai/DeepSeek-V2.5",       
+    "Pro/MiniMaxAI/MiniMax-M2.5",      
+    "Qwen/Qwen3-235B-A22B-Instruct-2507"    
 ]
 
 
 
 # ------------------- 可选配置 -------------------
 # 请求超时时间（秒）
-TIMEOUT = 60
+TIMEOUT = 120
 
 # API 调用失败时的最大重试次数
 MAX_RETRIES = 3

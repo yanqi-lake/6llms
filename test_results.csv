@@ -1,3 +1,12 @@
 problem_id,title,passed,test_count,compilation_error,runtime_error,code_length
-abc365_b,Second Best,True,13,,,477
-abc365_a,Leap Year,True,10,,,314
+abc365_b,Second Best,True,13,,,508
+abc365_a,Leap Year,True,10,,,340
+abc365_e,Xor Sigma Problem,False,20,,,749
+abc365_d,AtCoder Janken 3,False,20,,,915
+abc365_c,Transportation Expenses,True,20,,,1005
+3517,shortest-distance-after-road-addition-queries-i,True,1,,,1131
+3527,alternating-groups-iii,True,1,,,4393
+3533,snake-in-matrix,True,1,,,478
+3535,find-the-count-of-monotonic-pairs-i,False,0,"/tmp/tmpyvzrcagb/solution.cpp:3:22: error: ‘vector’ has not been declared
+    3 |     int countOfPai",,880
+3519,find-the-number-of-winning-players,True,1,,,695
