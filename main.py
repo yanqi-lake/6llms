@@ -27,7 +27,10 @@ from prompts import (
     PROMPT_SELECT_CODE,
     PROMPT_HOST_REVIEW_CODE,
     PROMPT_HOST_FIX_CODE,
-    PROMPT_HOST_CLEANUP_CODE
+    PROMPT_HOST_CLEANUP_CODE,
+    PROMPT_HOST_GENERATE_TESTCASES,
+    PROMPT_RETURN_TO_MEMBER,
+    PROMPT_REVIEW_TESTCASES
 )
 
 
@@ -52,17 +55,23 @@ def extract_code_from_response(response):
 LOG_FILE = "communication.txt"
 ANSWER_FILE = "ans.txt"
 
-# 动态获取成员数量
-MEMBER_COUNT = len(MODELS) - 1
+# 动态获取成员数量（排除主持人和测试用例审查员）
+# MODELS[0]=主持人, MODELS[1:~]=成员, MODELS[-1]=测试用例审查员
+MEMBER_COUNT = len(MODELS) - 2
 if MEMBER_COUNT < 1:
-    raise ValueError("config.py 中必须至少定义一个成员模型（MODELS 长度至少为2）")
+    raise ValueError("config.py 中必须至少定义一个成员模型（MODELS 长度至少为3：主持人+成员+审查员）")
+
+# 测试用例审查员模型
+REVIEWER_MODEL = MODELS[-1]
 
 print("=" * 50)
-print(f"多智能体协作编程系统启动（成员数量：{MEMBER_COUNT}）")
-print("模型分配：")
+print(f"多智能体协作编程系统启动")
+print(f"  成员数量：{MEMBER_COUNT}")
+print(f"模型分配：")
 print(f"  主持人：{MODELS[0]}")
 for i in range(MEMBER_COUNT):
     print(f"  成员 {i+1}：{MODELS[i+1]}")
+print(f"  测试用例审查员：{REVIEWER_MODEL}")
 print("=" * 50)
 
 
@@ -327,18 +336,30 @@ def select_best_code(codes, failed_members=None):
     return valid_codes[best_idx - 1] + 1  # 转换为1-based
 
 
-def solve_problem(question):
+# 全局变量保存测试用例和最佳思路
+current_test_cases = []
+current_best_idea = ""
+
+
+def solve_problem(question, test_cases=None):
     """
     解决单个编程问题的主流程
     
     Args:
         question: 编程问题描述
+        test_cases: 测试用例列表 [{"input": "...", "output": "..."}]（可选）
     
     Returns:
         str: 生成的最终代码（经过主持人审查清理）
     """
+    global current_test_cases, current_best_idea
+    
     log_message("初始问题", f"问题内容：\n{question}")
     print(f"\n问题：{question}")
+    
+    # 保存测试用例供后续使用
+    current_test_cases = test_cases if test_cases else []
+    current_best_idea = ""
 
     # 步骤1：生成思路
     print("\n[步骤1] 成员生成解题思路...")
@@ -356,6 +377,7 @@ def solve_problem(question):
     print("\n[步骤2] 成员投票选择最佳思路...")
     best_idea_idx = select_best_idea(ideas, failed_ideas)
     best_idea = ideas[best_idea_idx - 1]
+    current_best_idea = best_idea  # 保存供后续使用
     log_message("思路投票结果", f"最佳思路编号：{best_idea_idx}\n内容：{best_idea}")
     preview = best_idea[:100] + "..." if len(best_idea) > 100 else best_idea
     print(f"  最佳思路是方案 {best_idea_idx}：{preview}")
@@ -379,17 +401,442 @@ def solve_problem(question):
     log_message("代码投票结果", f"最佳代码编号：{best_code_idx}\n内容：{best_code}")
     print(f"  最佳代码是方案 {best_code_idx}")
 
-    # 步骤5：主持人审查和清理代码
-    print("\n[步骤5] 主持人审查并清理最终代码...")
-    final_code = host_review_code(best_code, best_code_idx)
+    # 步骤5：简化版主持人审查（使用public_test_cases）
+    print("\n[步骤5] 主持人审查代码...")
+    final_code = host_review_code_simple(best_code, best_code_idx, question, current_test_cases)
     log_message("主持人最终代码", final_code)
     
     return final_code
 
 
+# 全局变量保存测试用例和最佳思路
+current_test_cases = []
+current_best_idea = ""
+
+
+# 删除测试用例审查相关代码，使用简化的单阶段审查
+
+
+def host_review_code_simple(best_code, best_idx, question, test_cases):
+    """
+    简化版主持人审查代码
+    
+    只使用题目自带的 public_test_cases 进行测试
+    循环测试 - 编译 - 修复，最多1轮返回给成员
+    
+    Args:
+        best_code: 投票选出的最佳代码
+        best_idx: 最佳代码编号
+        question: 题目描述
+        test_cases: 题目自带的测试用例
+    
+    Returns:
+        str: 审查后的代码
+    """
+    from prompts import PROMPT_ANALYZE_ERROR
+    
+    current_code = best_code
+    max_refine_rounds = 1  # 最多返回给成员修复1轮
+    
+    for round_num in range(max_refine_rounds + 1):
+        print(f"\n  === 第{round_num + 1}轮审查 ===")
+        
+        # 步骤1: 编译代码
+        print(f"  正在编译代码...")
+        compile_success = False
+        for compile_attempt in range(3):
+            compile_result = try_compile(current_code)
+            if compile_result["success"]:
+                print(f"    ✓ 编译成功（第{compile_attempt + 1}次尝试）")
+                compile_success = True
+                break
+            else:
+                print(f"    ✗ 编译失败（第{compile_attempt + 1}次尝试）")
+                current_code = host_fix_code(current_code, compile_result["error"])
+        
+        if not compile_success:
+            print(f"    ✗ 无法编译，使用原始代码")
+            current_code = best_code
+            break
+        
+        # 步骤2: 运行测试
+        if compile_success and test_cases:
+            run_result = run_test_cases(current_code, test_cases)
+            
+            if run_result["success"]:
+                print(f"    ✓ 测试通过 ({len(run_result['test_results'])}个)")
+                break
+            else:
+                failed_count = sum(1 for tr in run_result["test_results"] if not tr["passed"])
+                print(f"    ✗ 测试失败 ({failed_count}/{len(test_cases)}个用例)")
+                
+                # 步骤3: 问题分析
+                print(f"  正在分析错误原因...")
+                error_details = []
+                for tr in run_result["test_results"]:
+                    if not tr["passed"]:
+                        error_details.append(
+                            f"输入: {tr.get('input', '')[:200]}\n"
+                            f"预期: {tr.get('expected', '')}\n"
+                            f"实际: {tr.get('actual', '')}"
+                        )
+                
+                error_summary = "\n\n---\n\n".join(error_details[:3])  # 最多3个
+                
+                analyze_prompt = PROMPT_ANALYZE_ERROR.format(
+                    question=question,
+                    code=current_code,
+                    error_summary=error_summary
+                )
+                
+                try:
+                    analyze_response = call_api(
+                        [{"role": "system", "content": SYSTEM_MEMBER},
+                         {"role": "user", "content": analyze_prompt}],
+                        model=MODELS[0]
+                    )
+                    log_message("问题分析", analyze_response)
+                    print(f"    分析: {analyze_response[:150]}...")
+                except:
+                    pass
+                
+                # 如果还有轮次，让成员重新生成
+                if round_num < max_refine_rounds:
+                    print(f"  正在让成员重新生成代码...")
+                    new_codes, _ = generate_codes(question, current_best_idea)
+                    new_best_idx = select_best_code(new_codes)
+                    current_code = new_codes[new_best_idx - 1]
+                else:
+                    print(f"  已达到最大轮数，使用当前代码")
+        elif compile_success and not test_cases:
+            print(f"    ⚠ 无测试用例，仅验证编译")
+            break
+    
+    # 清理代码
+    current_code = cleanup_code(current_code)
+    print(f"  审查完成，代码长度: {len(current_code)} 字符")
+    
+    return current_code
+
+
+def host_generate_testcases(question):
+    """
+    让主持人根据题目描述生成测试用例，然后让测试用例审查员审查
+    
+    审查员只删除错误的测试用例，不尝试修改
+    
+    Args:
+        question: 题目描述
+    
+    Returns:
+        list: [{"input": "...", "output": "..."}, ...]
+    """
+    from prompts import PROMPT_HOST_GENERATE_TESTCASES, PROMPT_REVIEW_TESTCASES
+    
+    prompt = PROMPT_HOST_GENERATE_TESTCASES.format(question=question)
+    messages = [
+        {"role": "system", "content": SYSTEM_MEMBER},
+        {"role": "user", "content": prompt}
+    ]
+    
+    try:
+        response = call_api(messages, model=MODELS[0])
+        
+        # 记录主持人生成测试用例的对话
+        log_message("主持人生成测试用例", f"题目描述：{question}\n\n生成的测试用例：\n{response}")
+        
+        test_cases = parse_testcases_from_response(response)
+        if test_cases:
+            print(f"    主持人生成了 {len(test_cases)} 个测试用例")
+            # 记录解析后的测试用例
+            log_message("解析后的测试用例", str(test_cases))
+            
+            # 让测试用例审查员审查
+            print(f"    测试用例审查员正在审查...")
+            test_cases_text = ""
+            for i, tc in enumerate(test_cases):
+                test_cases_text += f"测试用例{i+1}:\n输入:\n{tc.get('input', '')}\n预期输出:\n{tc.get('output', '')}\n\n"
+            
+            review_prompt = PROMPT_REVIEW_TESTCASES.format(
+                question=question,
+                test_cases=test_cases_text
+            )
+            review_messages = [
+                {"role": "system", "content": SYSTEM_MEMBER},
+                {"role": "user", "content": review_prompt}
+            ]
+            review_response = call_api(review_messages, model=REVIEWER_MODEL)
+            
+            # 记录审查结果
+            log_message("测试用例审查结果", f"审查员回复：\n{review_response}")
+            print(f"    审查结果: {review_response[:100]}...")
+            
+            # 如果审查发现问题，删除错误的测试用例
+            if "正确" not in review_response and review_response.strip():
+                print(f"    审查发现问题，删除错误的测试用例...")
+                
+                # 尝试解析审查员标记的需要删除的测试用例
+                # 审查员应该返回 "删除: 测试用例X" 格式
+                deleted_indices = []
+                for line in review_response.split('\n'):
+                    if '删除' in line or '删除' in line:
+                        # 尝试提取测试用例编号
+                        import re
+                        nums = re.findall(r'\d+', line)
+                        if nums:
+                            deleted_indices.append(int(nums[0]) - 1)  # 转为0索引
+                
+                # 删除标记的测试用例
+                if deleted_indices:
+                    original_count = len(test_cases)
+                    test_cases = [tc for i, tc in enumerate(test_cases) if i not in deleted_indices]
+                    print(f"    审查员删除了 {original_count - len(test_cases)} 个错误测试用例，保留 {len(test_cases)} 个")
+            
+            return test_cases
+    except Exception as e:
+        print(f"    生成测试用例失败: {e}")
+        log_message("生成测试用例失败", str(e))
+    
+    return []
+
+
+def parse_testcases_from_response(response):
+    """
+    从模型响应中解析出测试用例
+    
+    Args:
+        response: 模型生成的测试用例文本
+    
+    Returns:
+        list: [{"input": "...", "output": "..."}, ...]
+    """
+    import re
+    
+    test_cases = []
+    # 简单的解析：查找 "测试用例" 和 "预期输出:" 之间的内容
+    blocks = re.split(r'测试用例\d+:', response)
+    
+    for block in blocks[1:]:  # 跳过第一块（可能是空或标题）
+        input_match = re.search(r'输入:\s*\n?(.*?)(?=预期输出:|$)', block, re.DOTALL)
+        output_match = re.search(r'预期输出:\s*\n?(.*?)(?:```|$)', block, re.DOTALL)
+        
+        if input_match and output_match:
+            output = output_match.group(1).strip()
+            # 清理输出中的反引号和 markdown 标记
+            output = re.sub(r'```', '', output).strip()
+            
+            test_cases.append({
+                "input": input_match.group(1).strip(),
+                "output": output
+            })
+    
+    return test_cases
+
+
+def run_test_cases(code, test_cases, timeout=30):
+    """
+    运行测试用例
+    
+    Args:
+        code: C++ 源代码
+        test_cases: 测试用例列表 [{"input": "...", "output": "..."}]
+        timeout: 超时时间
+    
+    Returns:
+        dict: {
+            "success": bool,
+            "test_results": [{"input": "...", "expected": "...", "actual": "...", "passed": bool}, ...]
+        }
+    """
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    
+    result = {"success": False, "test_results": []}
+    
+    if not test_cases:
+        result["success"] = True
+        return result
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src_file = Path(tmpdir) / "solution.cpp"
+        exe_file = Path(tmpdir) / "solution"
+        
+        with open(src_file, "w", encoding="utf-8") as f:
+            f.write(code)
+        
+        # 编译
+        compile_result = subprocess.run(
+            ["g++", str(src_file), "-o", str(exe_file), "-std=c++17"],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        
+        if compile_result.returncode != 0:
+            return result
+        
+        # 运行每个测试用例
+        for tc in test_cases:
+            try:
+                run_result = subprocess.run(
+                    [str(exe_file)],
+                    input=tc.get("input", ""),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                
+                actual_output = run_result.stdout.strip()
+                expected_output = tc.get("output", "").strip()
+                
+                # 规范化输出：移除多余空白，处理多行输出
+                actual_lines = [line.strip() for line in actual_output.split('\n') if line.strip()]
+                expected_lines = [line.strip() for line in expected_output.split('\n') if line.strip()]
+                
+                # 比较时忽略行尾空白和多余换行
+                test_passed = actual_output == expected_output or actual_lines == expected_lines
+                
+                result["test_results"].append({
+                    "input": tc.get("input", ""),
+                    "expected": expected_output,
+                    "actual": actual_output,
+                    "passed": test_passed
+                })
+            except subprocess.TimeoutExpired:
+                result["test_results"].append({
+                    "input": tc.get("input", ""),
+                    "expected": tc.get("output", ""),
+                    "actual": "TIMEOUT",
+                    "passed": False
+                })
+            except Exception as e:
+                result["test_results"].append({
+                    "input": tc.get("input", ""),
+                    "expected": tc.get("output", ""),
+                    "actual": str(e),
+                    "passed": False
+                })
+    
+    result["success"] = all(tr["passed"] for tr in result["test_results"])
+    return result
+
+
+def return_to_members_and_refine(code, question, test_cases, generated_tc, 
+                                  run_result, generated_run_result, max_rounds):
+    """
+    返回给成员修复代码，并在修复后重新进行一轮投票选出最佳代码
+    
+    流程：
+    1. 将错误信息发送回各个成员
+    2. 各个成员重新生成代码
+    3. 重新投票选出最佳代码
+    4. 重复审查流程（第二轮）
+    
+    Args:
+        code: 当前代码
+        question: 题目描述
+        test_cases: 现有测试用例
+        generated_tc: 主持人生成的测试用例
+        run_result: 现有测试用例的运行结果
+        generated_run_result: 生成测试用例的运行结果
+        max_rounds: 最大轮数（第一轮和第二轮）
+    
+    Returns:
+        str: 修复后的代码
+    """
+    from prompts import PROMPT_RETURN_TO_MEMBER
+    
+    current_code = code
+    
+    for round_num in range(1, max_rounds + 1):
+        print(f"\n    === 第{round_num}轮审查 ===")
+        
+        # 收集所有失败的测试用例信息
+        failed_info = []
+        
+        # 现有测试用例的失败信息
+        for tr in run_result["test_results"]:
+            if not tr["passed"]:
+                failed_info.append(f"测试用例: 输入={tr['input'][:50]}... 预期输出={tr['expected']} 实际输出={tr['actual']}")
+        
+        # 生成测试用例的失败信息
+        for tr in generated_run_result["test_results"]:
+            if not tr["passed"]:
+                failed_info.append(f"生成测试: 输入={tr['input'][:50]}... 预期输出={tr['expected']} 实际输出={tr['actual']}")
+        
+        # 构建测试用例文本
+        test_cases_text = ""
+        for i, tc in enumerate(test_cases + generated_tc):
+            test_cases_text += f"测试用例{i+1}:\n输入:\n{tc.get('input', '')}\n预期输出:\n{tc.get('output', '')}\n\n"
+        
+        # 构建预期输出和实际输出
+        expected_text = "\n".join([tr['expected'] for tr in run_result['test_results'] + generated_run_result['test_results'] if not tr['passed']])
+        actual_text = "\n".join([tr['actual'] for tr in run_result['test_results'] + generated_run_result['test_results'] if not tr['passed']])
+        
+        # 调用成员修复
+        prompt = PROMPT_RETURN_TO_MEMBER.format(
+            question=question,
+            code=current_code,
+            test_cases=test_cases_text,
+            expected_output=expected_text,
+            actual_output=actual_text
+        )
+        
+        log_message(f"第{round_num}轮-返回给成员修复", 
+                   f"题目：{question}\n\n当前代码：\n{current_code}\n\n测试用例：\n{test_cases_text}\n\n预期输出：\n{expected_text}\n\n实际输出：\n{actual_text}")
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # 重新让所有成员生成代码（使用之前保存的最佳思路）
+        print(f"    正在让所有成员重新生成代码...")
+        new_codes, failed_members = generate_codes(question, current_best_idea if current_best_idea else "")
+        
+        # 投票选出新最佳代码
+        print(f"    正在投票选出新最佳代码...")
+        best_new_code_idx = select_best_code(new_codes, failed_members)
+        current_code = new_codes[best_new_code_idx - 1]
+        
+        log_message(f"第{round_num}轮-新最佳代码", f"代码：\n{current_code}")
+        print(f"    新最佳代码: 方案 {best_new_code_idx}")
+        
+        # 编译检查
+        if not try_compile(current_code)["success"]:
+            print(f"    第{round_num}轮: 编译失败")
+            if round_num == max_rounds:
+                print(f"    已达到最大轮数，直接输出当前代码")
+                return current_code
+            # 继续下一轮
+            run_result = {"success": False, "test_results": []}
+            generated_run_result = {"success": False, "test_results": []}
+            continue
+        
+        # 运行测试
+        run_result = run_test_cases(current_code, test_cases)
+        generated_run_result = run_test_cases(current_code, generated_tc)
+        
+        all_passed = run_result["success"] and generated_run_result["success"]
+        
+        if all_passed:
+            print(f"    ✓ 第{round_num}轮: 所有测试通过!")
+            return current_code
+        else:
+            failed_count = sum(1 for tr in run_result['test_results'] + generated_run_result['test_results'] if not tr['passed'])
+            print(f"    ✗ 第{round_num}轮: 仍有 {failed_count} 个测试失败")
+            
+            if round_num == max_rounds:
+                print(f"    已达到最大轮数，跳过第二阶段，直接输出当前代码")
+                return current_code
+    
+    return current_code
+
+
 def host_review_code(best_code, best_idx):
     """
-    步骤5：主持人审查并清理最佳代码
+    步骤5：主持人审查并清理最佳代码（保留兼容性）
     
     Args:
         best_code: 投票选出的最佳代码
@@ -398,31 +845,8 @@ def host_review_code(best_code, best_idx):
     Returns:
         str: 清理后的代码
     """
-    current_code = best_code
-    max_attempts = 3  # 最多尝试修复3次
-    
-    for attempt in range(max_attempts):
-        # 尝试编译当前代码
-        compile_result = try_compile(current_code)
-        
-        if compile_result["success"]:
-            print(f"  ✓ 代码编译成功（第{attempt + 1}次尝试）")
-            break
-        else:
-            print(f"  ✗ 代码编译失败（第{attempt + 1}次尝试）: {compile_result['error'][:100]}...")
-            
-            if attempt < max_attempts - 1:
-                # 让主持人尝试修复
-                print(f"  尝试修复编译错误...")
-                current_code = host_fix_code(current_code, compile_result["error"])
-            else:
-                print(f"  多次尝试后仍无法编译，使用原始代码")
-                current_code = best_code
-    
-    # 最后再清理一次代码（去除注释等）
-    current_code = cleanup_code(current_code)
-    print(f"  主持人审查完成，代码长度: {len(current_code)} 字符")
-    return current_code
+    # 兼容旧接口，直接调用新的两阶段审查
+    return host_two_stage_review(best_code, best_idx, "", [])
 
 
 def try_compile(code):
@@ -481,11 +905,16 @@ def host_fix_code(code, error_msg):
     
     try:
         fixed_code = call_api(messages, model=MODELS[0])
+        
+        # 记录主持人修复编译错误的对话
+        log_message("主持人修复编译错误", f"错误信息：{error_msg}\n\n修复后的代码：\n{fixed_code}")
+        
         cleaned = extract_code_from_response(fixed_code)
         if cleaned:
             return cleaned
     except Exception as e:
         print(f"  修复失败: {e}")
+        log_message("修复编译错误失败", str(e))
     
     return code  # 如果修复失败，返回原代码
 
@@ -504,11 +933,15 @@ def cleanup_code(code):
     
     try:
         cleaned = call_api(messages, model=MODELS[0])
+        
+        # 记录主持人清理代码的对话
+        log_message("主持人清理代码", f"原始代码：\n{code}\n\n清理后的代码：\n{cleaned}")
+        
         result = extract_code_from_response(cleaned)
         if result:
             return result
-    except:
-        pass
+    except Exception as e:
+        log_message("清理代码失败", str(e))
     
     return code
 

@@ -27,7 +27,7 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from main import solve_problem
+from main import solve_problem, MEMBER_COUNT, REVIEWER_MODEL
 from config import MODELS
 
 
@@ -56,7 +56,13 @@ def parse_args():
         "--start-index",
         type=int,
         default=0,
-        help="起始索引"
+        help="起始索引（从第几个题目开始，0-based）"
+    )
+    parser.add_argument(
+        "--end-index",
+        type=int,
+        default=None,
+        help="结束索引（测试到第几个题目结束，0-based，不包含）"
     )
     parser.add_argument(
         "--timeout",
@@ -72,9 +78,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_livecodebench_dataset(data_dir):
+def load_livecodebench_dataset(data_dir, limit=None):
     """
     加载 LiveCodeBench 数据集
+    
+    Args:
+        data_dir: 数据目录
+        limit: 限制加载的问题数量（可选）
     
     期望目录结构:
         data_dir/
@@ -102,6 +112,10 @@ def load_livecodebench_dataset(data_dir):
         with open(jsonl_file, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
+                    # 如果设置了 limit 且已达到，停止加载
+                    if limit and len(questions) >= limit:
+                        break
+                        
                     q_data = json.loads(line)
                     
                     # 字段映射：jsonl -> 内部格式
@@ -147,7 +161,10 @@ def load_livecodebench_dataset(data_dir):
                     else:
                         test_cases = [{"input": tc.get("input", ""), "output": tc.get("output", "")} for tc in public_tc]
                     
-                    problem["test_cases"] = test_cases
+                    # 保存 public_test_cases（主持人审查用）和 private_test_cases（最终评测用）
+                    problem["public_test_cases"] = [{"input": tc.get("input", ""), "output": tc.get("output", "")} for tc in public_tc]
+                    problem["private_test_cases"] = test_cases  # 保持原有名称用于最终评测
+                    problem["test_cases"] = test_cases  # 兼容旧代码
                     questions.append(problem)
         
         return questions
@@ -361,7 +378,8 @@ def test_single_problem(problem, timeout=30, verbose=False):
     problem_id = problem.get("id", problem.get("problem_id", "unknown"))
     title = problem.get("title", "")
     description = problem.get("description", problem.get("prompt", ""))
-    test_cases = problem.get("test_cases", [])
+    test_cases = problem.get("test_cases", [])  # private_test_cases 用于最终评测
+    public_test_cases = problem.get("public_test_cases", [])  # public_test_cases 用于主持人审查
     starter_code = problem.get("starter_code", {}).get("cpp", "")
     language = problem.get("language", "cpp")
     
@@ -376,9 +394,9 @@ def test_single_problem(problem, timeout=30, verbose=False):
     if starter_code:
         full_question += f"\n\n参考代码:\n{starter_code}"
     
-    # 调用多智能体系统生成代码
+    # 调用多智能体系统生成代码（传入 public_test_cases 用于主持人审查）
     print(f"  正在调用 {len(MODELS)-1} 个成员模型生成代码...")
-    raw_code = solve_problem(full_question)
+    raw_code = solve_problem(full_question, test_cases=public_test_cases)
     
     # 提取纯代码
     code = extract_code_from_response(raw_code)
@@ -387,7 +405,7 @@ def test_single_problem(problem, timeout=30, verbose=False):
         print(f"  生成代码长度: {len(code)} 字符")
         print(f"  代码预览:\n{code[:300]}...")
     
-    # 编译并运行
+    # 编译并运行（使用 private_test_cases 进行最终评测）
     print(f"  正在编译和运行...")
     test_result = compile_and_run(code, test_cases, timeout=timeout, language=language)
     
@@ -399,14 +417,15 @@ def test_single_problem(problem, timeout=30, verbose=False):
     }
 
 
-def run_batch_test(data_dir, limit=None, start_index=0, timeout=30, output="results.csv", verbose=False):
+def run_batch_test(data_dir, limit=None, start_index=0, end_index=None, timeout=30, output="results.csv", verbose=False):
     """
     批量测试主函数
     
     Args:
         data_dir: 数据目录
-        limit: 限制测试数量
-        start_index: 起始索引
+        limit: 限制测试数量（与 end-index 二选一）
+        start_index: 起始索引（从第几个题目开始，0-based）
+        end_index: 结束索引（测试到第几个题目结束，0-based，不包含）
         timeout: 单题超时时间
         output: 输出文件
         verbose: 详细输出
@@ -415,12 +434,14 @@ def run_batch_test(data_dir, limit=None, start_index=0, timeout=30, output="resu
     print("LiveCodeBench 批量测试")
     print("=" * 60)
     print(f"数据目录: {data_dir}")
-    print(f"使用模型: {MODELS}")
+    print(f"主持人：{MODELS[0]}")
+    print(f"成员: {[MODELS[i+1] for i in range(MEMBER_COUNT)]}")
+    print(f"测试用例审查员: {REVIEWER_MODEL}")
     
-    # 加载数据
+    # 加载数据（先加载全部，后面再用 limit 或范围限制）
     print("\n加载数据集...")
     try:
-        problems = load_livecodebench_dataset(data_dir)
+        problems = load_livecodebench_dataset(data_dir, limit=None)
     except FileNotFoundError as e:
         print(f"错误: {e}")
         print("\n请将 LiveCodeBench 数据放入指定目录。")
@@ -431,7 +452,11 @@ def run_batch_test(data_dir, limit=None, start_index=0, timeout=30, output="resu
     print(f"共加载 {total} 道问题")
     
     # 限制测试数量
-    if limit:
+    if end_index is not None:
+        # 指定范围 [start_index, end_index)
+        problems = problems[start_index:end_index]
+        print(f"测试范围: 第 {start_index+1} - {end_index} 题 (共 {len(problems)} 题)")
+    elif limit:
         problems = problems[start_index:start_index + limit]
         print(f"测试范围: 第 {start_index+1} - {start_index + len(problems)} 题")
     elif start_index > 0:
@@ -488,7 +513,10 @@ def run_batch_test(data_dir, limit=None, start_index=0, timeout=30, output="resu
     print(f"总题数: {total_count}")
     print(f"通过: {passed_count}")
     print(f"失败: {total_count - passed_count}")
-    print(f"通过率: {passed_count/total_count*100:.2f}%")
+    if total_count > 0:
+        print(f"通过率: {passed_count/total_count*100:.2f}%")
+    else:
+        print("通过率: N/A (无测试题目)")
     print(f"总耗时: {elapsed/60:.2f} 分钟")
     print(f"平均每题: {elapsed/total_count:.2f} 秒")
     
@@ -531,6 +559,7 @@ def main():
         data_dir=args.data_dir,
         limit=args.limit,
         start_index=args.start_index,
+        end_index=args.end_index,
         timeout=args.timeout,
         output=args.output,
         verbose=args.verbose

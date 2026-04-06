@@ -1,0 +1,21 @@
+# 参考文献
+
+[1] Chen Qian, Wei Liu, Hongzhang Liu, et al. Communicative Agents for Software Development[J]. arXiv preprint arXiv:2307.07924, 2023. (ACL 2024)
+
+[2] Sirui Hong, Mingchen Zhuge, Jiaqi Chen, et al. MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework[J]. arXiv preprint arXiv:2308.00352, 2023.
+
+[3] Taicheng Guo, Taoxiang Cheng, et al. Large Language Model based Multi-Agents: A Survey of Progress and Challenges[J]. arXiv preprint arXiv:2402.01680, 2024.
+
+[4] Edward J. Hu, Yelong Shen, Pengwei Huang, et al. LoRA: Low-Rank Adaptation of Large Language Models[J]. arXiv preprint arXiv:2106.09685, 2021.
+
+[5] OpenBMB. ChatDev 2.0: Dev All through LLM-powered Multi-Agent Collaboration[EB/OL]. https://github.com/OpenBMB/ChatDev, 2026.
+
+[6] Touvron E, Lavril M, Izacard G, et al. LLaMA: Open and Efficient Foundation Language Models[J]. arXiv preprint arXiv:2302.13971, 2023.
+
+[7] Wei Liu, Zhiyuan Liu, Maosong Sun. ChatDev: Chat-Powered Software Development Framework[EB/OL]. https://github.com/ChatDevSOFTWARE/ChatDev, 2023.
+
+[8] Brown T, Mann B, Ryder N, et al. Language Models are Few-Shot Learners[J]. Advances in Neural Information Processing Systems, 2020, 33: 1877-1901.
+
+[9] OpenAI. GPT-4 Technical Report[J]. arXiv preprint arXiv:2303.08774, 2023.
+
+[10] Achiam J, Adler S, Agarwal S, et al. GPT-4 System Card[J]. arXiv preprint arXiv:2303.08774, 2023.

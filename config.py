@@ -9,13 +9,14 @@ API_KEY = os.getenv("SILICONFLOW_API_KEY", "sk-frbpfmrjdbcipawssjhvqmbhoswtleulm
 BASE_URL = "https://api.siliconflow.cn/v1"
 
 # ------------------- 模型列表 -------------------
-# 索引顺序：0=主持人，1~5=五位成员
+# 索引顺序：0=主持人，1~4=四位成员，5=测试用例审查员
 # 你可以根据需求替换为硅基流动支持的其他模型
 MODELS = [
     "deepseek-ai/DeepSeek-V3",      # 主持人（较强模型）
     "deepseek-ai/DeepSeek-V2.5",       
     "Pro/MiniMaxAI/MiniMax-M2.5",      
-    "Qwen/Qwen3-235B-A22B-Instruct-2507"    
+    "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "Qwen/Qwen2.5-72B-Instruct",      # 测试用例审查员
 ]
 
 
@@ -23,6 +24,9 @@ MODELS = [
 # ------------------- 可选配置 -------------------
 # 请求超时时间（秒）
 TIMEOUT = 120
+API_TIMEOUT = TIMEOUT  # API 调用超时（秒）
+
+# API 调用失败时的最大重试次数
 
 # API 调用失败时的最大重试次数
 MAX_RETRIES = 3
