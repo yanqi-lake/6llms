@@ -9,6 +9,15 @@
     python test_single_model.py --model "Qwen/Qwen2.5-14B-Instruct"  # 指定模型
     python test_single_model.py --model "Qwen/Qwen2.5-72B-Instruct" --limit 10
     python test_single_model.py --output results_single.csv
+
+    # 指定测试范围（1-based 题号）
+    python test_single_model.py --start 1 --end 10                  # 测试第1-10题
+    python test_single_model.py --start 51 --end 100 --verbose      # 测试第51-100题
+
+    # 其他常用参数
+    python test_single_model.py --start 1 --end 50 --timeout 60     # 代码运行超时60秒
+    python test_single_model.py --start 1 --end 10 --api-timeout 300 # API调用超时5分钟
+    python test_single_model.py --list-models                       # 列出可用模型
 """
 
 import argparse
@@ -64,6 +73,24 @@ def parse_args():
         type=int,
         default=0,
         help="起始索引"
+    )
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=None,
+        help="起始题号（1-based），与 --end 配合使用指定测试范围"
+    )
+    parser.add_argument(
+        "--end",
+        type=int,
+        default=None,
+        help="结束题号（1-based），与 --start 配合使用指定测试范围"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=10,
+        help="代码运行超时时间（秒）"
     )
     parser.add_argument(
         "--api-timeout",
@@ -355,7 +382,7 @@ def generate_code_single_model(question, model, verbose=False, api_timeout=120):
         print(f"  调用模型: {model} (超时: {api_timeout}s)")
     
     try:
-        response = call_api(messages, model=model, timeout=api_timeout)
+        response = call_api(messages, model=model)
         code = extract_code_from_response(response)
         return code
     except Exception as e:
@@ -439,7 +466,7 @@ def test_single_problem(problem, model, timeout=30, verbose=False, api_timeout=1
     }
 
 
-def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, output="results.csv", verbose=False, api_timeout=120):
+def run_batch_test(model, data_dir, limit=None, start_index=0, start=None, end=None, timeout=30, output="results.csv", verbose=False, api_timeout=120):
     """
     批量测试主函数
     
@@ -448,6 +475,8 @@ def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, outpu
         data_dir: 数据目录
         limit: 限制测试数量
         start_index: 起始索引
+        start: 起始题号（1-based）
+        end: 结束题号（1-based）
         timeout: 代码运行超时时间
         output: 输出文件
         verbose: 是否显示详细信息
@@ -473,7 +502,13 @@ def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, outpu
     print(f"共加载 {total} 道问题")
     
     # 限制测试数量
-    if limit:
+    if start is not None and end is not None:
+        # 使用 --start/--end 指定范围
+        start_idx = max(0, start - 1)  # 转为 0-based
+        end_idx = min(total, end)       # end 包含
+        problems = problems[start_idx:end_idx]
+        print(f"测试范围: 第 {start} - {end} 题 (共 {len(problems)} 题)")
+    elif limit:
         problems = problems[start_index:start_index + limit]
         print(f"测试范围: 第 {start_index+1} - {start_index + len(problems)} 题")
     elif start_index > 0:
@@ -638,6 +673,8 @@ def main():
         data_dir=args.data_dir,
         limit=args.limit,
         start_index=args.start_index,
+        start=args.start,
+        end=args.end,
         timeout=args.timeout,
         output=args.output,
         verbose=args.verbose,

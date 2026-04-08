@@ -1,2 +1,0 @@
-problem_id,title,passed,test_count,compilation_error,runtime_error,code_length,model
-abc365_b,Second Best,True,13,,,514,Qwen/Qwen2.5-72B-Instruct
