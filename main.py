@@ -55,13 +55,13 @@ def extract_code_from_response(response):
 LOG_FILE = "communication.txt"
 ANSWER_FILE = "ans.txt"
 
-# 动态获取成员数量（排除主持人和测试用例审查员）
-# MODELS[0]=主持人, MODELS[1:~]=成员, MODELS[-1]=测试用例审查员
+# 动态获取成员数量（排除主持人和问题分析员）
+# MODELS[0]=主持人, MODELS[1:~]=成员, MODELS[-1]=问题分析员
 MEMBER_COUNT = len(MODELS) - 2
 if MEMBER_COUNT < 1:
-    raise ValueError("config.py 中必须至少定义一个成员模型（MODELS 长度至少为3：主持人+成员+审查员）")
+    raise ValueError("config.py 中必须至少定义一个成员模型（MODELS 长度至少为3：主持人+成员+分析员）")
 
-# 测试用例审查员模型
+# 问题分析员模型
 REVIEWER_MODEL = MODELS[-1]
 
 print("=" * 50)
@@ -71,7 +71,7 @@ print(f"模型分配：")
 print(f"  主持人：{MODELS[0]}")
 for i in range(MEMBER_COUNT):
     print(f"  成员 {i+1}：{MODELS[i+1]}")
-print(f"  测试用例审查员：{REVIEWER_MODEL}")
+print(f"  问题分析员：{REVIEWER_MODEL}")
 print("=" * 50)
 
 
@@ -521,9 +521,9 @@ def host_review_code_simple(best_code, best_idx, question, test_cases):
 
 def host_generate_testcases(question):
     """
-    让主持人根据题目描述生成测试用例，然后让测试用例审查员审查
+    让主持人根据题目描述生成测试用例，然后让问题分析员审查
     
-    审查员只删除错误的测试用例，不尝试修改
+    分析员只删除错误的测试用例，不尝试修改
     
     Args:
         question: 题目描述
@@ -551,8 +551,8 @@ def host_generate_testcases(question):
             # 记录解析后的测试用例
             log_message("解析后的测试用例", str(test_cases))
             
-            # 让测试用例审查员审查
-            print(f"    测试用例审查员正在审查...")
+            # 让问题分析员审查
+            print(f"    问题分析员正在审查...")
             test_cases_text = ""
             for i, tc in enumerate(test_cases):
                 test_cases_text += f"测试用例{i+1}:\n输入:\n{tc.get('input', '')}\n预期输出:\n{tc.get('output', '')}\n\n"
@@ -568,15 +568,15 @@ def host_generate_testcases(question):
             review_response = call_api(review_messages, model=REVIEWER_MODEL)
             
             # 记录审查结果
-            log_message("测试用例审查结果", f"审查员回复：\n{review_response}")
+            log_message("测试用例审查结果", f"分析员回复：\n{review_response}")
             print(f"    审查结果: {review_response[:100]}...")
             
             # 如果审查发现问题，删除错误的测试用例
             if "正确" not in review_response and review_response.strip():
                 print(f"    审查发现问题，删除错误的测试用例...")
                 
-                # 尝试解析审查员标记的需要删除的测试用例
-                # 审查员应该返回 "删除: 测试用例X" 格式
+                # 尝试解析分析员标记的需要删除的测试用例
+                # 分析员应该返回 "删除: 测试用例X" 格式
                 deleted_indices = []
                 for line in review_response.split('\n'):
                     if '删除' in line or '删除' in line:
@@ -590,7 +590,7 @@ def host_generate_testcases(question):
                 if deleted_indices:
                     original_count = len(test_cases)
                     test_cases = [tc for i, tc in enumerate(test_cases) if i not in deleted_indices]
-                    print(f"    审查员删除了 {original_count - len(test_cases)} 个错误测试用例，保留 {len(test_cases)} 个")
+                    print(f"    分析员删除了 {original_count - len(test_cases)} 个错误测试用例，保留 {len(test_cases)} 个")
             
             return test_cases
     except Exception as e:

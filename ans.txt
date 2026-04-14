@@ -1,60 +1,49 @@
 #include <bits/stdc++.h>
 using namespace std;
+using int64 = long long;
+using i128 = __int128_t;
 
-bool canPair(const string& a, const string& b) {
-    if (a == b) return true;
-    if (a.size() != b.size()) return false;
-    for (size_t i = 0; i < a.size(); i++) {
-        if (a[i] != b[a.size() - 1 - i]) return false;
+int64 mod_mul(int64 a, int64 b, int64 mod) {
+    return (i128)a * b % mod;
+}
+
+int64 mod_pow(int64 a, int64 e, int64 mod) {
+    int64 res = 1 % mod;
+    a %= mod;
+    while (e > 0) {
+        if (e & 1) res = mod_mul(res, a, mod);
+        a = mod_mul(a, a, mod);
+        e >>= 1;
     }
-    return true;
+    return res;
 }
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
     
-    string S;
-    if (!(cin >> S)) return 0;
+    int64 N, K, M, P;
+    if (!(cin >> N >> K >> M >> P)) return 0;
     
-    int n = S.size();
-    int L = 0, R = n - 1;
-    int pairs = 0;
-    
-    while (L < R) {
-        bool found = false;
-        for (int i = L; i < R; i++) {
-            string SL = S.substr(L, i - L + 1);
-            for (int j = R; j > i; j--) {
-                string SR = S.substr(j, R - j + 1);
-                if (canPair(SL, SR)) {
-                    L = i + 1;
-                    R = j - 1;
-                    pairs++;
-                    found = true;
-                    break;
-                }
-            }
-            if (found) break;
-        }
-        if (!found) {
-            cout << "NO" << endl;
-            return 0;
-        }
-    }
-    
-    int total = pairs * 2;
-    if (L == R) {
-        total++;
-    }
-    
-    if (total <= 1) {
-        cout << "NO" << endl;
+    if (P == 1) {
+        cout << 0 << "\n";
         return 0;
     }
     
-    cout << "YES" << endl;
-    cout << total << endl;
+    if (K == 1) {
+        cout << (N % P) << "\n";
+        return 0;
+    }
     
+    int64 powM = mod_pow(M % P, K - 2, P);
+    int64 term1 = mod_mul(M % P, N % P, P);
+    int64 sum = M % P * ((M + 1) % P) % P;
+    sum = sum * ((P + 1) / 2) % P;
+    int64 term2 = mod_mul((K - 1) % P, sum, P);
+    int64 diff = (term1 - term2) % P;
+    if (diff < 0) diff += P;
+    int64 result = mod_mul(diff, powM, P);
+    
+    cout << result << "\n";
     return 0;
 }

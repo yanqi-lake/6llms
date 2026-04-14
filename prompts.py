@@ -166,7 +166,7 @@ PROMPT_RETURN_TO_MEMBER = (
     "重要：只返回修复后的纯代码，不要包含任何解释或markdown标记。"
 )
 
-# 测试用例审查员判断问题来源的提示
+# 问题分析员分析测试失败原因的提示
 PROMPT_JUDGE_TEST_ISSUE = (
     "题目描述：{question}\n\n"
     "代码：\n{code}\n\n"
@@ -177,7 +177,7 @@ PROMPT_JUDGE_TEST_ISSUE = (
     "请明确回复：\"测试用例问题\" 或 \"代码问题\"，并附带详细说明。"
 )
 
-# 测试用例审查员审查测试用例的提示
+# 问题分析员审查测试用例的提示
 PROMPT_REVIEW_TESTCASES = (
     "题目描述：{question}\n\n"
     "主持人生成的测试用例：\n{test_cases}\n\n"

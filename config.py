@@ -9,14 +9,14 @@ API_KEY = os.getenv("SILICONFLOW_API_KEY", "sk-frbpfmrjdbcipawssjhvqmbhoswtleulm
 BASE_URL = "https://api.siliconflow.cn/v1"
 
 # ------------------- 模型列表 -------------------
-# 索引顺序：0=主持人，1~4=四位成员，5=测试用例审查员
+# 索引顺序：0=主持人，1~4=四位成员，5=问题分析员
 # 你可以根据需求替换为硅基流动支持的其他模型
 MODELS = [
     "deepseek-ai/DeepSeek-V3",      # 主持人（较强模型）
     "deepseek-ai/DeepSeek-V2.5",       
     "Pro/MiniMaxAI/MiniMax-M2.5",      
     "Qwen/Qwen3-235B-A22B-Instruct-2507",
-    "Qwen/Qwen2.5-72B-Instruct",      # 测试用例审查员
+    "Qwen/Qwen2.5-72B-Instruct",      # 问题分析员
 ]
 
 
