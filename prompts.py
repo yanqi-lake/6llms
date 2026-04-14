@@ -201,3 +201,29 @@ PROMPT_ANALYZE_ERROR = (
     "3. 如果测试用例本身有问题也请指出\n"
     "请详细说明问题所在，帮助成员修复代码。"
 )
+
+# 主持人格式化题目的提示
+PROMPT_FORMAT_QUESTION = (
+    '请仔细阅读以下原始题目，然后将其整理成标准JSON格式。\n\n'
+    '原始题目：\n{original_question}\n\n'
+    '请生成以下格式的JSON（必须包含question_content，其他字段如果有就添加，没有就留空）：\n'
+    '```json\n'
+    '{{\n'
+    '  \'question_title\': \'题目标题\',\n'
+    '  \'question_content\': \'题目描述（完整内容）\',\n'
+    '  \'input_format\': \'输入格式描述\',\n'
+    '  \'output_format\': \'输出格式描述\',\n'
+    '  \'sample_input\': \'样例输入\',\n'
+    '  \'sample_output\': \'样例输出\',\n'
+    '  \'constraints\': \'约束条件\',\n'
+    '  \'difficulty\': \'难度（easy/medium/hard）\',\n'
+    '  \'platform\': \'平台（如atcoder, leetcode等）\',\n'
+    '  \'public_test_cases\': [{{\'input\': \'输入\', \'output\': \'输出\'}}, ...]\n'
+    '}}\n'
+    '```\n'
+    '重要：\n'
+    '1. public_test_cases 从题目描述的样例中提取,不要自己生成\n'
+    '2. question_content 必须包含完整的题目描述（不要省略）\n'
+    '3. 只返回JSON，不要包含任何其他解释\n'
+    '4. 如果某些字段题目中没有，可以省略或留空字符串\n'
+)

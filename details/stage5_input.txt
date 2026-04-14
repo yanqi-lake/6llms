@@ -1,0 +1,2 @@
+best_code_idx: 2
+test_cases: [{'input': '7 3 2 997', 'output': '16'}]

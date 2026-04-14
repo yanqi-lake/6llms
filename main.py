@@ -12,6 +12,8 @@ Architecture:
 """
 
 import re
+import json
+import os
 import os
 import datetime
 import concurrent.futures
@@ -20,6 +22,7 @@ from collections import Counter
 from api import call_api
 from config import MODELS
 from prompts import (
+    PROMPT_FORMAT_QUESTION,
     SYSTEM_MEMBER,
     PROMPT_GET_IDEA,
     PROMPT_SELECT_IDEA,
@@ -53,6 +56,32 @@ def extract_code_from_response(response):
     return code.strip()
 
 LOG_FILE = "communication.txt"
+
+
+# Details folder for debugging
+DETAILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'details')
+
+
+def save_detail(stage_name, content, subname=''):
+    """
+    保存调试信息到 details 文件夹
+    
+    Args:
+        stage_name: 阶段名称 (如 stage0, stage1 等)
+        content: 要保存的内容
+        subname: 子名称（可选，用于区分同一阶段的不同部分）
+    """
+    os.makedirs(DETAILS_DIR, exist_ok=True)
+    if subname:
+        filename = f"{stage_name}_{subname}.txt"
+    else:
+        filename = f"{stage_name}.txt"
+    filepath = os.path.join(DETAILS_DIR, filename)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(str(content))
+    print(f"    [DEBUG] 已保存 {filename}")
+
+
 ANSWER_FILE = "ans.txt"
 
 # 动态获取成员数量（排除主持人和问题分析员）
@@ -83,6 +112,118 @@ def log_message(step, content, log_file=LOG_FILE):
         f.write(f"[{timestamp}] 步骤：{step}\n")
         f.write(f"{content}\n")
         f.flush()
+
+
+
+def format_question(question):
+    from prompts import PROMPT_FORMAT_QUESTION
+    
+    print("\n[步骤0] 主持人格式化题目...")
+    
+    prompt = PROMPT_FORMAT_QUESTION.format(original_question=question)
+    messages = [
+        {"role": "system", "content": SYSTEM_MEMBER},
+        {"role": "user", "content": prompt}
+    ]
+    
+    try:
+        response = call_api(messages, model=MODELS[0])
+        log_message("主持人格式化题目", "原始题目：\n" + question + "\n\n格式化结果：\n" + response)
+        save_detail("stage0", response, "api_response")
+        
+        response_clean = re.sub(r'^```json\s*\n', '', response, flags=re.MULTILINE)
+        response_clean = re.sub(r'^```\s*\n', '', response_clean, flags=re.MULTILINE)
+        response_clean = re.sub(r'\n```\s*$', '', response_clean, flags=re.MULTILINE)
+        
+        try:
+            # 处理不合法的转义字符
+            response_clean = response_clean.replace('\\', '\\\\')
+            response_clean = response_clean.replace('\$', '\\$')
+            response_clean = response_clean.replace('\%', '\\%')
+            response_clean = response_clean.replace('\{', '\\{')
+            response_clean = response_clean.replace('\}', '\\}')
+            # 移除所有无法处理的控制字符
+            response_clean = re.sub(r'[\x00-\x1f]', '', response_clean)
+            formatted = json.loads(response_clean)
+            title = formatted.get("question_title", "")
+            difficulty = formatted.get("difficulty", "")
+            platform = formatted.get("platform", "")
+            print("    题目标题: " + title)
+            print("    难度: " + difficulty)
+            print("    平台: " + platform)
+            
+            public_tc = formatted.get("public_test_cases", [])
+            if public_tc:
+                print("    提取到 " + str(len(public_tc)) + " 个测试用例")
+            
+            full_question = build_question_from_formatted(formatted)
+            save_detail("stage0", json.dumps(formatted, ensure_ascii=False, indent=2), "parsed_json")
+            save_detail("stage0", full_question, "formatted_question")
+            return formatted, full_question
+        except json.JSONDecodeError as e:
+            print("    解析JSON失败: " + str(e))
+            # 尝试使用正则表达式提取关键信息
+            try:
+                title_match = re.search(r'"question_title"\s*:\s*"([^"]+)"', response_clean)
+                content_match = re.search(r'"question_content"\s*:\s*"([^"]+)"', response_clean)
+                tc_match = re.search(r'"public_test_cases"\s*:\s*(\[.*\])', response_clean, re.DOTALL)
+                
+                formatted = {}
+                if title_match:
+                    formatted["question_title"] = title_match.group(1)
+                if content_match:
+                    formatted["question_content"] = content_match.group(1)
+                if tc_match:
+                    try:
+                        formatted["public_test_cases"] = json.loads(tc_match.group(1))
+                    except:
+                        pass
+                
+                if formatted:
+                    print("    提取到部分信息")
+                    full_question = build_question_from_formatted(formatted)
+                    return formatted, full_question
+            except:
+                pass
+            print("    使用原始问题继续")
+            return {}, question
+    except Exception as e:
+        print("    格式化失败: " + str(e))
+        log_message("格式化题目失败", str(e))
+        return {}, question
+
+
+def build_question_from_formatted(formatted):
+    parts = []
+    
+    title = formatted.get("question_title", "")
+    if title:
+        parts.append("题目标题: " + title + "\n")
+    
+    content = formatted.get("question_content", "")
+    if content:
+        parts.append("题目描述:\n" + content + "\n")
+    
+    inp_fmt = formatted.get("input_format", "")
+    if inp_fmt:
+        parts.append("输入格式:\n" + inp_fmt + "\n")
+    
+    out_fmt = formatted.get("output_format", "")
+    if out_fmt:
+        parts.append("输出格式:\n" + out_fmt + "\n")
+    
+    sample_in = formatted.get("sample_input", "")
+    sample_out = formatted.get("sample_output", "")
+    if sample_in and sample_out:
+        parts.append("样例输入:\n" + sample_in + "\n")
+        parts.append("样例输出:\n" + sample_out + "\n")
+    
+    constraints = formatted.get("constraints", "")
+    if constraints:
+        parts.append("约束条件:\n" + constraints + "\n")
+    
+    return "\n".join(parts)
+
 
 
 def read_question_from_file(filepath="question.txt"):
@@ -119,6 +260,9 @@ def get_ideas(question):
     ideas = [None] * MEMBER_COUNT
     failed_members = []  # 记录失败的成员索引
     
+    print("\n[步骤1] 成员生成解题思路...")
+    save_detail("stage1", "开始生成解题思路", "start")
+    
     with concurrent.futures.ThreadPoolExecutor(max_workers=MEMBER_COUNT) as executor:
         future_to_index = {}
         for i in range(MEMBER_COUNT):
@@ -141,6 +285,10 @@ def get_ideas(question):
                 print(f"获取成员 {idx+1} 的思路时出错: {e}")
                 failed_members.append(idx)
                 ideas[idx] = ""
+    
+    # 保存思路结果
+    ideas_text = "\n\n".join([f"成员 {i+1}: {ideas[i]}" if ideas[i] else f"成员 {i+1}: <空>" for i in range(len(ideas))])
+    save_detail("stage1", ideas_text, "all_ideas")
     
     return ideas, failed_members
 
@@ -217,6 +365,9 @@ def select_best_idea(ideas, failed_members=None):
     counter = Counter(selections)
     # 平局时选择编号较小的
     best_idx = max(range(len(valid_ideas)), key=lambda x: counter[valid_ideas[x]]) + 1
+    
+    save_detail("stage2", f"投票结果: {selections}\n最佳思路编号: {best_idx}", "vote_result")
+    
     return valid_ideas[best_idx - 1] + 1  # 转换为1-based
 
 
@@ -233,6 +384,9 @@ def generate_codes(question, solution):
     """
     codes = [None] * MEMBER_COUNT
     failed_members = []
+    
+    print("\n[步骤3] 成员根据最佳思路编写代码...")
+    save_detail("stage3", f"解题思路: {solution[:500]}...", "solution")
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=MEMBER_COUNT) as executor:
         future_to_index = {}
@@ -258,6 +412,10 @@ def generate_codes(question, solution):
                 print(f"❌ 成员 {idx+1}（模型：{model_name}）写代码失败: {e}")
                 failed_members.append(idx)
                 codes[idx] = ""
+    
+    # 保存代码结果
+    codes_text = "\n\n".join([f"成员 {i+1} 代码:\n{codes[i]}" if codes[i] else f"成员 {i+1}: <空>" for i in range(len(codes))])
+    save_detail("stage3", codes_text, "all_codes")
     
     return codes, failed_members
 
@@ -333,6 +491,9 @@ def select_best_code(codes, failed_members=None):
     counter = Counter(selections)
     # 平局时选择编号较小的
     best_idx = max(range(len(valid_codes)), key=lambda x: counter[valid_codes[x]]) + 1
+    
+    save_detail("stage4", f"投票结果: {selections}\n最佳代码编号: {best_idx}", "vote_result")
+    
     return valid_codes[best_idx - 1] + 1  # 转换为1-based
 
 
@@ -354,8 +515,21 @@ def solve_problem(question, test_cases=None):
     """
     global current_test_cases, current_best_idea
     
-    log_message("初始问题", f"问题内容：\n{question}")
-    print(f"\n问题：{question}")
+    # 步骤0：主持人格式化题目
+    formatted_question, formatted_question_str = format_question(question)
+    
+    # 使用格式化后的问题描述，如果没有格式化则使用原始问题
+    if formatted_question_str:
+        question_to_use = formatted_question_str
+    else:
+        question_to_use = question
+    
+    # 如果没有传入test_cases，尝试从格式化结果中获取
+    if not test_cases and formatted_question.get("public_test_cases"):
+        test_cases = formatted_question.get("public_test_cases")
+    
+    log_message("初始问题", "问题内容：\n" + question_to_use)
+    print("\n问题：" + question_to_use[:200] + "...")
     
     # 保存测试用例供后续使用
     current_test_cases = test_cases if test_cases else []
@@ -363,7 +537,7 @@ def solve_problem(question, test_cases=None):
 
     # 步骤1：生成思路
     print("\n[步骤1] 成员生成解题思路...")
-    ideas, failed_ideas = get_ideas(question)
+    ideas, failed_ideas = get_ideas(question_to_use)
     ideas_log = "\n".join([f"成员 {i+1} 思路：\n{ideas[i] if ideas[i] else '<空>'}" for i in range(MEMBER_COUNT)])
     log_message("成员解题思路", ideas_log)
     for i, idea in enumerate(ideas):
@@ -384,7 +558,7 @@ def solve_problem(question, test_cases=None):
 
     # 步骤3：编写代码
     print("\n[步骤3] 成员根据最佳思路编写代码...")
-    codes, failed_codes = generate_codes(question, best_idea)
+    codes, failed_codes = generate_codes(question_to_use, best_idea)
     codes_log = "\n".join([f"成员 {i+1} 代码：\n{codes[i]}" for i in range(MEMBER_COUNT)])
     log_message("成员生成的代码", codes_log)
     for i, code in enumerate(codes):
@@ -403,7 +577,8 @@ def solve_problem(question, test_cases=None):
 
     # 步骤5：简化版主持人审查（使用public_test_cases）
     print("\n[步骤5] 主持人审查代码...")
-    final_code = host_review_code_simple(best_code, best_code_idx, question, current_test_cases)
+    save_detail("stage5", "开始主持人审查", "start")
+    final_code = host_review_code_simple(best_code, best_code_idx, question, current_test_cases, question_to_use)
     log_message("主持人最终代码", final_code)
     
     return final_code
@@ -417,7 +592,8 @@ current_best_idea = ""
 # 删除测试用例审查相关代码，使用简化的单阶段审查
 
 
-def host_review_code_simple(best_code, best_idx, question, test_cases):
+def host_review_code_simple(best_code, best_idx, question, test_cases, question_to_use=None):
+    save_detail("stage5", f"best_code_idx: {best_idx}\ntest_cases: {test_cases}", "input")
     """
     简化版主持人审查代码
     
@@ -503,7 +679,7 @@ def host_review_code_simple(best_code, best_idx, question, test_cases):
                 # 如果还有轮次，让成员重新生成
                 if round_num < max_refine_rounds:
                     print(f"  正在让成员重新生成代码...")
-                    new_codes, _ = generate_codes(question, current_best_idea)
+                    new_codes, _ = generate_codes(question_to_use if question_to_use else question, current_best_idea)
                     new_best_idx = select_best_code(new_codes)
                     current_code = new_codes[new_best_idx - 1]
                 else:
@@ -515,6 +691,8 @@ def host_review_code_simple(best_code, best_idx, question, test_cases):
     # 清理代码
     current_code = cleanup_code(current_code)
     print(f"  审查完成，代码长度: {len(current_code)} 字符")
+    
+    save_detail("stage5", current_code, "final_code")
     
     return current_code
 
@@ -793,7 +971,7 @@ def return_to_members_and_refine(code, question, test_cases, generated_tc,
         
         # 重新让所有成员生成代码（使用之前保存的最佳思路）
         print(f"    正在让所有成员重新生成代码...")
-        new_codes, failed_members = generate_codes(question, current_best_idea if current_best_idea else "")
+        new_codes, failed_members = generate_codes(question_to_use if question_to_use else question, current_best_idea if current_best_idea else "")
         
         # 投票选出新最佳代码
         print(f"    正在投票选出新最佳代码...")
@@ -963,6 +1141,8 @@ def main():
 
     # 步骤5：验证并输出最终代码
     print("\n[步骤5] 验证并输出最终代码...")
+    save_detail("stage5", best_code, "final_result")
+    
     if best_code.strip():
         print("\n最终代码：")
         print("=" * 50)

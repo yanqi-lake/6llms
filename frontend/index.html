@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6LLMs 多智能体协作编程系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        header p {
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        .input-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .input-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        .btn-run {
+            display: block;
+            width: 100%;
+            padding: 15px 30px;
+            margin-top: 15px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-run:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,212,255,0.3);
+        }
+        
+        .btn-run:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .stages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stage-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s;
+        }
+        
+        .stage-card.active {
+            border-color: #00d4ff;
+            background: rgba(0,212,255,0.1);
+        }
+        
+        .stage-card.completed {
+            border-color: #00ff88;
+            background: rgba(0,255,136,0.1);
+        }
+        
+        .stage-card.error {
+            border-color: #ff4444;
+            background: rgba(255,68,68,0.1);
+        }
+        
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .stage-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .stage-card.active .stage-number {
+            background: #00d4ff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .stage-card.completed .stage-number {
+            background: #00ff88;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .stage-title {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        
+        .stage-content {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.6;
+        }
+        
+        .stage-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .code-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .code-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #00ff88;
+        }
+        
+        .code-block {
+            background: #0d1117;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        .code-block pre {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #c9d1d9;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .model-list {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .model-list span {
+            color: #00d4ff;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0,212,255,0.3);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            width: 200px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            transition: width 0.3s;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .config-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .config-panel h3 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #888;
+        }
+        
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .config-label {
+            color: #888;
+        }
+        
+        .config-value {
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 6LLMs 多智能体协作编程</h1>
+            <p>基于多模型协作的代码生成系统</p>
+        </header>
+        
+        <div class="config-panel">
+            <h3>⚙️ 系统配置</h3>
+            <div class="config-item">
+                <span class="config-label">主持人</span>
+                <span class="config-value" id="host-model">DeepSeek-V3</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">成员数量</span>
+                <span class="config-value" id="member-count">3</span>
+            </div>
+            <div class="config-item">
+                <span class="config-label">问题分析员</span>
+                <span class="config-value" id="reviewer-model">Qwen2.5-72B</span>
+            </div>
+        </div>
+        
+        <div class="input-section">
+            <h2>📝 输入编程问题</h2>
+            <textarea id="question-input" placeholder="请输入您的编程问题...&#10;&#10;例如：&#10;给定一个整数数组，找出第二大的元素并返回其索引。"></textarea>
+            <button class="btn-run" id="run-btn" onclick="runSystem()">
+                🚀 开始运行
+            </button>
+        </div>
+        
+        <div class="stages" id="stages-container">
+            <div class="stage-card" id="stage0">
+                <div class="stage-header">
+                    <span class="stage-number">0</span>
+                    <span class="stage-title">主持人格式化题目</span>
+                </div>
+                <div class="stage-content" id="stage0-content">
+                    等待输入...
+                </div>
+            </div>
+            
+            <div class="stage-card" id="stage1">
+                <div class="stage-header">
+                    <span class="stage-number">1</span>
+                    <span class="stage-title">成员生成解题思路</span>
+                </div>
+                <div class="stage-content" id="stage1-content">
+                    等待上一步完成...
+                </div>
+            </div>
+            
+            <div class="stage-card" id="stage2">
+                <div class="stage-header">
+                    <span class="stage-number">2</span>
+                    <span class="stage-title">投票选择最佳思路</span>
+                </div>
+                <div class="stage-content" id="stage2-content">
+                    等待上一步完成...
+                </div>
+            </div>
+            
+            <div class="stage-card" id="stage3">
+                <div class="stage-header">
+                    <span class="stage-number">3</span>
+                    <span class="stage-title">成员编写代码</span>
+                </div>
+                <div class="stage-content" id="stage3-content">
+                    等待上一步完成...
+                </div>
+            </div>
+            
+            <div class="stage-card" id="stage4">
+                <div class="stage-header">
+                    <span class="stage-number">4</span>
+                    <span class="stage-title">投票选择最佳代码</span>
+                </div>
+                <div class="stage-content" id="stage4-content">
+                    等待上一步完成...
+                </div>
+            </div>
+            
+            <div class="stage-card" id="stage5">
+                <div class="stage-header">
+                    <span class="stage-number">5</span>
+                    <span class="stage-title">主持人审查代码</span>
+                </div>
+                <div class="stage-content" id="stage5-content">
+                    等待上一步完成...
+                </div>
+            </div>
+        </div>
+        
+        <div class="code-section" id="result-section" style="display: none;">
+            <h2>✨ 最终代码</h2>
+            <div class="code-block">
+                <pre id="final-code"></pre>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <div class="status-info">
+            <span id="status-text">等待输入...</span>
+        </div>
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <span>处理中...</span>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let isRunning = false;
+        
+        function updateStage(stageNum, status, content = '') {
+            const stage = document.getElementById('stage' + stageNum);
+            const contentEl = document.getElementById('stage' + stageNum + '-content');
+            
+            stage.classList.remove('active', 'completed', 'error');
+            
+            if (status === 'running') {
+                stage.classList.add('active');
+                contentEl.innerHTML = content || '<div class="loading"><div class="spinner"></div> 处理中...</div>';
+            } else if (status === 'completed') {
+                stage.classList.add('completed');
+                contentEl.innerHTML = content || '✅ 完成';
+            } else if (status === 'error') {
+                stage.classList.add('error');
+                contentEl.innerHTML = content || '❌ 错误';
+            } else {
+                contentEl.innerHTML = content || '等待...';
+            }
+        }
+        
+        function updateStatus(text, show = false) {
+            document.getElementById('status-text').textContent = text;
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+        
+        function updateProgress(percent) {
+            document.getElementById('progress').style.width = percent + '%';
+        }
+        
+        async function runSystem() {
+            const question = document.getElementById('question-input').value.trim();
+            if (!question) {
+                alert('请输入编程问题');
+                return;
+            }
+            
+            if (isRunning) {
+                alert('系统正在运行中');
+                return;
+            }
+            
+            isRunning = true;
+            document.getElementById('run-btn').disabled = true;
+            
+            // Reset stages
+            for (let i = 0; i <= 5; i++) {
+                updateStage(i, 'pending', '等待...');
+            }
+            document.getElementById('result-section').style.display = 'none';
+            
+            updateStatus('正在启动系统...', true);
+            updateProgress(0);
+            
+            try {
+                // Stage 0: Format question
+                updateStage(0, 'running', '正在格式化题目...');
+                updateStatus('步骤0: 主持人格式化题目', true);
+                updateProgress(10);
+                
+                const stage0Res = await fetch('/api/format', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question})
+                });
+                const stage0Data = await stage0Res.json();
+                
+                if (stage0Data.success) {
+                    updateStage(0, 'completed', `✅ 格式化完成<br>标题: ${stage0Data.title || 'N/A'}<br>提取测试用例: ${stage0Data.test_cases_count || 0}个`);
+                } else {
+                    updateStage(0, 'completed', '✅ 使用原始问题');
+                }
+                updateProgress(20);
+                
+                // Stage 1: Generate ideas
+                updateStage(1, 'running', '正在生成解题思路...');
+                updateStatus('步骤1: 成员生成解题思路', true);
+                updateProgress(30);
+                
+                const stage1Res = await fetch('/api/ideas', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question})
+                });
+                const stage1Data = await stage1Res.json();
+                
+                if (stage1Data.success) {
+                    updateStage(1, 'completed', `✅ 生成完成<br>有效思路: ${stage1Data.count}个`);
+                } else {
+                    updateStage(1, 'error', '❌ ' + stage1Data.error);
+                }
+                updateProgress(45);
+                
+                // Stage 2: Select best idea
+                updateStage(2, 'running', '正在投票...');
+                updateStatus('步骤2: 投票选择最佳思路', true);
+                updateProgress(55);
+                
+                const stage2Res = await fetch('/api/select_idea', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const stage2Data = await stage2Res.json();
+                
+                if (stage2Data.success) {
+                    updateStage(2, 'completed', `✅ 投票完成<br>最佳方案: #${stage2Data.best_idx}`);
+                } else {
+                    updateStage(2, 'error', '❌ ' + stage2Data.error);
+                }
+                updateProgress(65);
+                
+                // Stage 3: Write code
+                updateStage(3, 'running', '正在编写代码...');
+                updateStatus('步骤3: 成员编写代码', true);
+                updateProgress(75);
+                
+                const stage3Res = await fetch('/api/code', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question})
+                });
+                const stage3Data = await stage3Res.json();
+                
+                if (stage3Data.success) {
+                    updateStage(3, 'completed', `✅ 代码生成完成<br>有效代码: ${stage3Data.count}个`);
+                } else {
+                    updateStage(3, 'error', '❌ ' + stage3Data.error);
+                }
+                updateProgress(85);
+                
+                // Stage 4: Select best code
+                updateStage(4, 'running', '正在投票...');
+                updateStatus('步骤4: 投票选择最佳代码', true);
+                updateProgress(90);
+                
+                const stage4Res = await fetch('/api/select_code', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const stage4Data = await stage4Res.json();
+                
+                if (stage4Data.success) {
+                    updateStage(4, 'completed', `✅ 投票完成<br>最佳代码: #${stage4Data.best_idx}`);
+                } else {
+                    updateStage(4, 'error', '❌ ' + stage4Data.error);
+                }
+                updateProgress(95);
+                
+                // Stage 5: Review code
+                updateStage(5, 'running', '正在审查代码...');
+                updateStatus('步骤5: 主持人审查代码', true);
+                
+                const stage5Res = await fetch('/api/review', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const stage5Data = await stage5Res.json();
+                
+                if (stage5Data.success) {
+                    updateStage(5, 'completed', '✅ 审查完成');
+                    document.getElementById('final-code').textContent = stage5Data.code;
+                    document.getElementById('result-section').style.display = 'block';
+                } else {
+                    updateStage(5, 'error', '❌ ' + stage5Data.error);
+                }
+                updateProgress(100);
+                
+                updateStatus('完成!', false);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus('错误: ' + error.message, false);
+            }
+            
+            isRunning = false;
+            document.getElementById('run-btn').disabled = false;
+        }
+        
+        // Load config on page load
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('host-model').textContent = data.host_model;
+                    document.getElementById('member-count').textContent = data.member_count;
+                    document.getElementById('reviewer-model').textContent = data.reviewer_model;
+                }
+            } catch (e) {
+                console.log('Could not load config');
+            }
+        }
+        
+        loadConfig();
+    </script>
+</body>
+</html>
