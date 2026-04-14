@@ -1,110 +1,105 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
 using namespace std;
 
-struct Fraction {
-    long long num;  // 分子
-    long long den;   // 分母
-    
-    Fraction(long long n = 0, long long d = 1) {
-        if (d < 0) { n = -n; d = -d; }
-        long long g = gcd(abs(n), d);
-        num = n / g;
-        den = d / g;
-    }
-    
-    // 加法
-    Fraction operator+(const Fraction& other) const {
-        long long n = num * other.den + other.num * den;
-        long long d = den * other.den;
-        return Fraction(n, d);
-    }
-    
-    // 乘法（乘以一个整数）
-    Fraction operator*(long long k) const {
-        return Fraction(num * k, den);
-    }
-    
-    // 除法（除以一个整数）
-    Fraction operator/(long long k) const {
-        return Fraction(num, den * k);
-    }
-    
-    // 打印
-    void print() const {
-        cout << num << " " << den << "\n";
-    }
-};
+const int N = 10010;
+string s;
+int n;
+bool pal[N][N];
 
-long long gcd(long long a, long long b) {
-    return b == 0 ? a : gcd(b, a % b);
+void precompute() {
+    n = s.size();
+    for (int i = 0; i < n; i++) {
+        pal[i][i] = true;
+        if (i < n - 1) pal[i][i+1] = (s[i] == s[i+1]);
+    }
+    for (int len = 3; len <= n; len++) {
+        for (int i = 0; i + len - 1 < n; i++) {
+            int j = i + len - 1;
+            pal[i][j] = (s[i] == s[j] && pal[i+1][j-1]);
+        }
+    }
 }
 
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    
-    int n, m;
-    if (!(cin >> n >> m)) return 0;
-    
-    vector<vector<int>> adj(n + 1);      // 出边
-    vector<int> inDegree(n + 1, 0);      // 入度
-    vector<int> outDegree(n + 1, 0);     // 出度
-    
-    // 读入图
-    for (int i = 1; i <= n; i++) {
-        int d;
-        cin >> d;
-        outDegree[i] = d;
-        for (int j = 0; j < d; j++) {
-            int a;
-            cin >> a;
-            adj[i].push_back(a);
-            inDegree[a]++;
+bool canMatch(int l1, int r1, int l2, int r2) {
+    if (r1 - l1 != r2 - l2) return false;
+    int len = r1 - l1 + 1;
+    bool equal = true;
+    for (int i = 0; i < len; i++) {
+        if (s[l1 + i] != s[l2 + i]) {
+            equal = false;
+            break;
         }
     }
-    
-    // 使用队列进行拓扑排序
-    queue<int> q;
-    vector<Fraction> water(n + 1, Fraction(0, 1));  // 每个节点收到的水量
-    
-    // 初始：m个接收口各收到1吨水
-    for (int i = 1; i <= m; i++) {
-        if (inDegree[i] == 0) {  // 入度为0的节点是接收口
-            water[i] = Fraction(1, 1);
-            q.push(i);
+    if (equal) return true;
+    bool reverse = true;
+    for (int i = 0; i < len; i++) {
+        if (s[l1 + i] != s[l2 + len - 1 - i]) {
+            reverse = false;
+            break;
         }
     }
-    
-    // 拓扑排序
-    while (!q.empty()) {
-        int u = q.front();
-        q.pop();
-        
-        if (outDegree[u] == 0) continue;  // 最终排水口不再流出
-        
-        // 将u的水均分到所有出边
-        Fraction each = water[u] / outDegree[u];
-        for (int v : adj[u]) {
-            water[v] = water[v] + each;
-            inDegree[v]--;
-            if (inDegree[v] == 0) {
-                q.push(v);
+    return reverse;
+}
+
+int solve(int l, int r, vector<vector<int>>& memo) {
+    if (l >= r) return 0;
+    if (memo[l][r] != -1) return memo[l][r];
+
+    int res = 0;
+    int len = r - l + 1;
+    if (len % 2 == 0) {
+        for (int k = 1; k <= len / 2; k++) {
+            int l1 = l, r1 = l + k - 1;
+            int l2 = r - k + 1, r2 = r;
+            if (canMatch(l1, r1, l2, r2)) {
+                if (k == len / 2) {
+                    res = max(res, 2);
+                } else {
+                    int inner = solve(l + k, r - k, memo);
+                    if (inner > 0) {
+                        res = max(res, inner + 2);
+                    }
+                }
+            }
+        }
+    } else {
+        for (int k = 1; k <= len / 2; k++) {
+            int l1 = l, r1 = l + k - 1;
+            int l2 = r - k + 1, r2 = r;
+            if (canMatch(l1, r1, l2, r2)) {
+                if (k == len / 2) {
+                    int mid = l + k;
+                    if (pal[mid][mid]) {
+                        res = max(res, 3);
+                    }
+                } else {
+                    int inner = solve(l + k, r - k, memo);
+                    if (inner > 0) {
+                        res = max(res, inner + 2);
+                    }
+                }
             }
         }
     }
-    
-    // 输出所有最终排水口（出度为0的节点）
-    vector<int> finals;
-    for (int i = 1; i <= n; i++) {
-        if (outDegree[i] == 0) {
-            finals.push_back(i);
-        }
+    memo[l][r] = res;
+    return res;
+}
+
+int main() {
+    cin >> s;
+    n = s.size();
+    vector<vector<int>> memo(n, vector<int>(n, -1));
+    precompute();
+
+    int maxParts = solve(0, n - 1, memo);
+    if (maxParts < 2) {
+        cout << "NO" << endl;
+    } else {
+        cout << "YES" << endl;
+        cout << maxParts << endl;
     }
-    sort(finals.begin(), finals.end());
-    
-    for (int v : finals) {
-        water[v].print();
-    }
-    
     return 0;
 }

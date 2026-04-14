@@ -7,8 +7,17 @@
 用法:
     python test_single_model.py                                    # 交互式选择模型
     python test_single_model.py --model "Qwen/Qwen2.5-14B-Instruct"  # 指定模型
-    python test_single_model.py --model "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" --limit 10
+    python test_single_model.py --model "Qwen/Qwen2.5-72B-Instruct" --limit 10
     python test_single_model.py --output results_single.csv
+
+    # 指定测试范围（1-based 题号）
+    python test_single_model.py --start 1 --end 10                  # 测试第1-10题
+    python test_single_model.py --start 51 --end 100 --verbose      # 测试第51-100题
+
+    # 其他常用参数
+    python test_single_model.py --start 1 --end 50 --timeout 60     # 代码运行超时60秒
+    python test_single_model.py --start 1 --end 10 --api-timeout 300 # API调用超时5分钟
+    python test_single_model.py --list-models                       # 列出可用模型
 """
 
 import argparse
@@ -66,10 +75,28 @@ def parse_args():
         help="起始索引"
     )
     parser.add_argument(
+        "--start",
+        type=int,
+        default=None,
+        help="起始题号（1-based），与 --end 配合使用指定测试范围"
+    )
+    parser.add_argument(
+        "--end",
+        type=int,
+        default=None,
+        help="结束题号（1-based），与 --start 配合使用指定测试范围"
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
-        default=30,
-        help="单个问题测试超时时间（秒）"
+        default=10,
+        help="代码运行超时时间（秒）"
+    )
+    parser.add_argument(
+        "--api-timeout",
+        type=int,
+        default=120,
+        help="API 调用超时时间（秒）"
     )
     parser.add_argument(
         "--verbose",
@@ -323,7 +350,7 @@ def compile_and_run(code, test_cases, timeout=30, language="cpp"):
     return result
 
 
-def generate_code_single_model(question, model, verbose=False):
+def generate_code_single_model(question, model, verbose=False, api_timeout=120):
     """
     使用单一模型直接生成代码
     
@@ -331,6 +358,7 @@ def generate_code_single_model(question, model, verbose=False):
         question: 问题描述
         model: 模型名称
         verbose: 是否显示详细信息
+        api_timeout: API 超时时间（秒）
     
     Returns:
         str: 生成的代码
@@ -351,7 +379,7 @@ def generate_code_single_model(question, model, verbose=False):
     ]
     
     if verbose:
-        print(f"  调用模型: {model}")
+        print(f"  调用模型: {model} (超时: {api_timeout}s)")
     
     try:
         response = call_api(messages, model=model)
@@ -362,9 +390,16 @@ def generate_code_single_model(question, model, verbose=False):
         return ""
 
 
-def test_single_problem(problem, model, timeout=30, verbose=False):
+def test_single_problem(problem, model, timeout=30, verbose=False, api_timeout=120):
     """
     测试单个问题（使用单一模型）
+    
+    Args:
+        problem: 问题字典
+        model: 模型名称
+        timeout: 代码运行超时时间
+        verbose: 是否显示详细信息
+        api_timeout: API 超时时间（秒）
     """
     problem_id = problem.get("id", problem.get("problem_id", "unknown"))
     title = problem.get("title", "")
@@ -378,6 +413,17 @@ def test_single_problem(problem, model, timeout=30, verbose=False):
         print(f"问题 {problem_id}: {title}")
         print(f"描述: {description[:200]}..." if len(description) > 200 else f"描述: {description}")
         print(f"测试用例数量: {len(test_cases)}")
+        print(f"API 超时: {api_timeout} 秒")
+    
+    # 构建完整问题描述
+    full_question = f"题目: {title}\n\n{description}"
+    if starter_code:
+        full_question += f"\n\n参考代码:\n{starter_code}"
+    
+    # 调用单一模型生成代码
+    if verbose:
+        print(f"  正在调用模型 {model} 生成代码...")
+    code = generate_code_single_model(full_question, model, verbose=verbose, api_timeout=api_timeout)
     
     # 构建完整问题描述
     full_question = f"题目: {title}\n\n{description}"
@@ -420,15 +466,28 @@ def test_single_problem(problem, model, timeout=30, verbose=False):
     }
 
 
-def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, output="results.csv", verbose=False):
+def run_batch_test(model, data_dir, limit=None, start_index=0, start=None, end=None, timeout=30, output="results.csv", verbose=False, api_timeout=120):
     """
     批量测试主函数
+    
+    Args:
+        model: 模型名称
+        data_dir: 数据目录
+        limit: 限制测试数量
+        start_index: 起始索引
+        start: 起始题号（1-based）
+        end: 结束题号（1-based）
+        timeout: 代码运行超时时间
+        output: 输出文件
+        verbose: 是否显示详细信息
+        api_timeout: API 超时时间（秒）
     """
     print("=" * 60)
     print("单一模型批量测试")
     print("=" * 60)
     print(f"测试模型: {model}")
     print(f"数据目录: {data_dir}")
+    print(f"API 超时: {api_timeout} 秒")
     
     # 加载数据
     print("\n加载数据集...")
@@ -443,7 +502,13 @@ def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, outpu
     print(f"共加载 {total} 道问题")
     
     # 限制测试数量
-    if limit:
+    if start is not None and end is not None:
+        # 使用 --start/--end 指定范围
+        start_idx = max(0, start - 1)  # 转为 0-based
+        end_idx = min(total, end)       # end 包含
+        problems = problems[start_idx:end_idx]
+        print(f"测试范围: 第 {start} - {end} 题 (共 {len(problems)} 题)")
+    elif limit:
         problems = problems[start_index:start_index + limit]
         print(f"测试范围: 第 {start_index+1} - {start_index + len(problems)} 题")
     elif start_index > 0:
@@ -467,7 +532,7 @@ def run_batch_test(model, data_dir, limit=None, start_index=0, timeout=30, outpu
         print(f"\n[{i+1}/{total_count}] 测试问题: {problem_id}")
         
         try:
-            result = test_single_problem(problem, model, timeout=timeout, verbose=verbose)
+            result = test_single_problem(problem, model, timeout=timeout, verbose=verbose, api_timeout=api_timeout)
             results.append(result)
             
             # 统计
@@ -608,9 +673,12 @@ def main():
         data_dir=args.data_dir,
         limit=args.limit,
         start_index=args.start_index,
+        start=args.start,
+        end=args.end,
         timeout=args.timeout,
         output=args.output,
-        verbose=args.verbose
+        verbose=args.verbose,
+        api_timeout=args.api_timeout
     )
 
 

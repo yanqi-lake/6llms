@@ -1,38 +1,49 @@
-#include <iostream>
-#include <string>
-#include <algorithm>
-
+#include <bits/stdc++.h>
 using namespace std;
+using int64 = long long;
+using i128 = __int128_t;
 
-string highPrecisionAdd(string a, string b) {
-    while (a.length() > 1 && a[0] == '0') a.erase(a.begin());
-    while (b.length() > 1 && b[0] == '0') b.erase(b.begin());
+int64 mod_mul(int64 a, int64 b, int64 mod) {
+    return (i128)a * b % mod;
+}
 
-    if (a.length() < b.length()) swap(a, b);
-
-    b.insert(0, a.length() - b.length(), '0');
-
-    string result;
-    int carry = 0;
-
-    for (int i = a.length() - 1; i >= 0; --i) {
-        int sum = (a[i] - '0') + (b[i] - '0') + carry;
-        result.push_back(sum % 10 + '0');
-        carry = sum / 10;
+int64 mod_pow(int64 a, int64 e, int64 mod) {
+    int64 res = 1 % mod;
+    a %= mod;
+    while (e > 0) {
+        if (e & 1) res = mod_mul(res, a, mod);
+        a = mod_mul(a, a, mod);
+        e >>= 1;
     }
-
-    if (carry > 0) result.push_back(carry + '0');
-
-    reverse(result.begin(), result.end());
-
-    while (result.length() > 1 && result[0] == '0') result.erase(result.begin());
-
-    return result;
+    return res;
 }
 
 int main() {
-    string a, b;
-    cin >> a >> b;
-    cout << highPrecisionAdd(a, b) << endl;
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    
+    int64 N, K, M, P;
+    if (!(cin >> N >> K >> M >> P)) return 0;
+    
+    if (P == 1) {
+        cout << 0 << "\n";
+        return 0;
+    }
+    
+    if (K == 1) {
+        cout << (N % P) << "\n";
+        return 0;
+    }
+    
+    int64 powM = mod_pow(M % P, K - 2, P);
+    int64 term1 = mod_mul(M % P, N % P, P);
+    int64 sum = M % P * ((M + 1) % P) % P;
+    sum = sum * ((P + 1) / 2) % P;
+    int64 term2 = mod_mul((K - 1) % P, sum, P);
+    int64 diff = (term1 - term2) % P;
+    if (diff < 0) diff += P;
+    int64 result = mod_mul(diff, powM, P);
+    
+    cout << result << "\n";
     return 0;
 }
