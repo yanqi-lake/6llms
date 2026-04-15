@@ -2,26 +2,27 @@
 #include <iostream>
 using namespace std;
 
-long long pow_mod(long long a, long long b, long long mod) {
-    long long res = 1;
-    a %= mod;
-    while (b > 0) {
-        if (b & 1) res = res * a % mod;
-        a = a * a % mod;
-        b >>= 1;
-    }
-    return res;
-}
-
 int main() {
-    long long N, K, M, P;
-    cin >> N >> K >> M >> P;
-
-    long long pow_m = pow_mod(M, K-1, P);
-    long long t = (K-1) * (M+1) / 2 % P;
-    long long ans = (pow_m * (N % P - t + P)) % P;
-
-    cout << ans << endl;
+    int n;
+    cin >> n;
+    
+    int a[n], b[n], g[n], k[n];
+    for (int i = 0; i < n; ++i) {
+        cin >> a[i] >> b[i] >> g[i] >> k[i];
+    }
+    
+    int x, y;
+    cin >> x >> y;
+    
+    int result = -1;
+    for (int i = n - 1; i >= 0; --i) {
+        if (x >= a[i] && x <= a[i] + g[i] && y >= b[i] && y <= b[i] + k[i]) {
+            result = i + 1;
+            break;
+        }
+    }
+    
+    cout << result << endl;
     return 0;
 }
 
@@ -31,101 +32,61 @@ int main() {
 #include <bits/stdc++.h>
 using namespace std;
 
-long long mod_pow(long long a, long long e, long long mod) {
-    long long res = 1 % mod;
-    a %= mod;
-    while (e > 0) {
-        if (e & 1) res = (__int128)res * a % mod;
-        a = (__int128)a * a % mod;
-        e >>= 1;
-    }
-    return res;
-}
+struct Carpet {
+    long long a, b, g, k;
+};
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    
-    long long N, K, M, P;
-    if (!(cin >> N >> K >> M >> P)) return 0;
-    
-    if (P == 1) {
-        cout << 0 << "\n";
-        return 0;
+    int n;
+    if (!(cin >> n)) return 0;
+    vector<Carpet> carpets(n);
+    for (int i = 0; i < n; ++i) {
+        long long a, b, g, k;
+        cin >> a >> b >> g >> k;
+        carpets[i] = {a, b, g, k};
     }
-    
-    long long pow_mod = mod_pow(M % P, K - 1, P);
-    
-    __int128 A = K - 1;
-    __int128 B = M + 1;
-    __int128 AB = A * B;
-    
-    long long t_mod;
-    if ((AB % 2) == 0) {
-        t_mod = (long long)((AB / 2) % P);
-    } else {
-        if ((A % 2) == 0) {
-            t_mod = (long long)(((A / 2) * B) % P);
-        } else {
-            t_mod = (long long)((A * (B / 2)) % P);
+    long long x, y;
+    cin >> x >> y;
+    int ans = -1;
+    for (int i = n - 1; i >= 0; --i) {
+        const auto &c = carpets[i];
+        if (x >= c.a && x <= c.a + c.g && y >= c.b && y <= c.b + c.k) {
+            ans = i + 1;
+            break;
         }
     }
-    
-    long long n_mod = N % P;
-    long long diff = n_mod - t_mod;
-    diff %= P;
-    if (diff < 0) diff += P;
-    
-    long long result = (__int128)pow_mod * diff % P;
-    cout << result << "\n";
-    
+    cout << ans;
     return 0;
 }
 
 成员 3 代码:
 #include <iostream>
+#include <vector>
 using namespace std;
 
-typedef long long ll;
-
-ll mul_mod(ll a, ll b, ll mod) {
-    if (mod <= 1000000000)
-        return (a % mod) * (b % mod) % mod;
-    ll res = 0;
-    a %= mod;
-    b %= mod;
-    while (b) {
-        if (b & 1) res = (res + a) % mod;
-        a = (a + a) % mod;
-        b >>= 1;
-    }
-    return res;
-}
-
-ll pow_mod(ll base, ll exp, ll mod) {
-    ll res = 1;
-    while (exp) {
-        if (exp & 1) res = mul_mod(res, base, mod);
-        base = mul_mod(base, base, mod);
-        exp >>= 1;
-    }
-    return res;
-}
-
 int main() {
-    ll N, K, M, P;
-    cin >> N >> K >> M >> P;
-
-    if (K == 1) {
-        cout << N % P << endl;
-        return 0;
+    int n;
+    cin >> n;
+    vector<vector<int>> carpets;
+    for (int i = 0; i < n; i++) {
+        int a, b, g, k;
+        cin >> a >> b >> g >> k;
+        carpets.push_back({a, b, g, k});
     }
-
-    ll powM = pow_mod(M, K - 1, P);
-    ll t = (K - 1) * (M + 1) / 2;
-    ll diff = ((N - t) % P + P) % P;
-    ll ans = mul_mod(powM, diff, P);
-
-    cout << ans << endl;
+    int x, y;
+    cin >> x >> y;
+    for (int i = n - 1; i >= 0; i--) {
+        int a = carpets[i][0];
+        int b = carpets[i][1];
+        int g = carpets[i][2];
+        int k = carpets[i][3];
+        if (x >= a && x <= a + g && y >= b && y <= b + k) {
+            cout << i + 1 << endl;
+            return 0;
+        }
+    }
+    cout << -1 << endl;
     return 0;
 }

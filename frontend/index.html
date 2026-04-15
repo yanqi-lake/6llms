@@ -19,9 +19,10 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
+            padding-bottom: 80px;
         }
         
         header {
@@ -100,8 +101,8 @@
         }
         
         .stages {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            display: flex;
+            flex-direction: column;
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -109,9 +110,9 @@
         .stage-card {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
-            padding: 20px;
             border: 1px solid rgba(255,255,255,0.05);
             transition: all 0.3s;
+            overflow: hidden;
         }
         
         .stage-card.active {
@@ -121,7 +122,7 @@
         
         .stage-card.completed {
             border-color: #00ff88;
-            background: rgba(0,255,136,0.1);
+            background: rgba(0,255,136,0.05);
         }
         
         .stage-card.error {
@@ -132,20 +133,22 @@
         .stage-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 15px;
+            padding: 20px;
+            cursor: pointer;
         }
         
         .stage-number {
-            width: 30px;
-            height: 30px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: #333;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 16px;
+            flex-shrink: 0;
         }
         
         .stage-card.active .stage-number {
@@ -155,6 +158,7 @@
         
         .stage-card.completed .stage-number {
             background: #00ff88;
+            color: #000;
         }
         
         @keyframes pulse {
@@ -162,53 +166,219 @@
             50% { opacity: 0.5; }
         }
         
+        .stage-info {
+            flex: 1;
+        }
+        
         .stage-title {
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .stage-subtitle {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .stage-toggle {
+            font-size: 1.2rem;
+            color: #888;
+            transition: transform 0.3s;
+        }
+        
+        .stage-card.expanded .stage-toggle {
+            transform: rotate(180deg);
         }
         
         .stage-content {
-            font-size: 0.85rem;
-            color: #aaa;
-            line-height: 1.6;
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid rgba(255,255,255,0.05);
         }
         
-        .stage-content pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            max-height: 200px;
-            overflow-y: auto;
+        .stage-card.expanded .stage-content {
+            display: block;
+        }
+        
+        .detail-section {
+            margin-top: 15px;
+        }
+        
+        .detail-section h3 {
+            font-size: 0.95rem;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .member-item {
             background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00d4ff;
         }
         
-        .code-section {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
+        .member-item.winner {
+            border-left-color: #00ff88;
+            background: rgba(0,255,136,0.1);
         }
         
-        .code-section h2 {
-            font-size: 1.2rem;
-            margin-bottom: 15px;
+        .member-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .member-name {
+            font-weight: 500;
+            color: #00d4ff;
+        }
+        
+        .member-name.winner {
             color: #00ff88;
         }
         
-        .code-block {
-            background: #0d1117;
-            border-radius: 10px;
-            padding: 20px;
-            overflow-x: auto;
+        .member-model {
+            font-size: 0.8rem;
+            color: #666;
         }
         
-        .code-block pre {
+        .copy-btn {
+            background: rgba(0,212,255,0.2);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: #00d4ff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: rgba(0,212,255,0.3);
+        }
+        
+        .copy-btn.copied {
+            background: rgba(0,255,136,0.2);
+            border-color: rgba(0,255,136,0.3);
+            color: #00ff88;
+        }
+        
+        .member-content {
+            font-size: 0.9rem;
+            color: #ccc;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .code-content {
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
-            line-height: 1.5;
+            font-size: 0.85rem;
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
             color: #c9d1d9;
+        }
+        
+        .vote-result {
+            background: rgba(0,255,136,0.1);
+            border: 1px solid #00ff88;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .vote-result h4 {
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+        
+        .vote-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+        
+        .vote-bar-label {
+            width: 80px;
+            font-size: 0.85rem;
+        }
+        
+        .vote-bar-fill {
+            flex: 1;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .vote-bar-value {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            transition: width 0.3s;
+        }
+        
+        .vote-bar-count {
+            width: 30px;
+            text-align: right;
+            font-size: 0.85rem;
+            color: #00d4ff;
+        }
+        
+        .test-case {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .test-case-label {
+            color: #00d4ff;
+            margin-right: 10px;
+        }
+        
+        .test-case-content {
+            color: #aaa;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .question-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .info-item {
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 0.95rem;
+            color: #00d4ff;
         }
         
         .status-bar {
@@ -216,12 +386,13 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: rgba(0,0,0,0.9);
-            padding: 15px;
+            background: rgba(0,0,0,0.95);
+            padding: 12px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 100;
         }
         
         .status-info {
@@ -246,8 +417,8 @@
         }
         
         .spinner {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border: 2px solid rgba(0,212,255,0.3);
             border-top-color: #00d4ff;
             border-radius: 50%;
@@ -259,7 +430,7 @@
         }
         
         .progress-bar {
-            width: 200px;
+            width: 150px;
             height: 6px;
             background: rgba(255,255,255,0.1);
             border-radius: 3px;
@@ -272,38 +443,59 @@
             transition: width 0.3s;
         }
         
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
-        
         .config-panel {
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
-        }
-        
-        .config-panel h3 {
-            font-size: 1rem;
-            margin-bottom: 15px;
-            color: #888;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
         }
         
         .config-item {
             display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            gap: 10px;
         }
         
         .config-label {
             color: #888;
+            font-size: 0.9rem;
         }
         
         .config-value {
             color: #00d4ff;
+            font-weight: 500;
+        }
+
+        .code-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        
+        .code-section h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #00ff88;
+        }
+        
+        .final-code-block {
+            background: #0d1117;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .final-code-block pre {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #c9d1d9;
         }
     </style>
 </head>
@@ -315,18 +507,17 @@
         </header>
         
         <div class="config-panel">
-            <h3>⚙️ 系统配置</h3>
             <div class="config-item">
-                <span class="config-label">主持人</span>
-                <span class="config-value" id="host-model">DeepSeek-V3</span>
+                <span class="config-label">🎯 主持人</span>
+                <span class="config-value" id="host-model">-</span>
             </div>
             <div class="config-item">
-                <span class="config-label">成员数量</span>
-                <span class="config-value" id="member-count">3</span>
+                <span class="config-label">👥 成员数量</span>
+                <span class="config-value" id="member-count">-</span>
             </div>
             <div class="config-item">
-                <span class="config-label">问题分析员</span>
-                <span class="config-value" id="reviewer-model">Qwen2.5-72B</span>
+                <span class="config-label">🔍 问题分析员</span>
+                <span class="config-value" id="reviewer-model">-</span>
             </div>
         </div>
         
@@ -339,70 +530,166 @@
         </div>
         
         <div class="stages" id="stages-container">
+            <!-- Stage 0 -->
             <div class="stage-card" id="stage0">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(0)">
                     <span class="stage-number">0</span>
-                    <span class="stage-title">主持人格式化题目</span>
+                    <div class="stage-info">
+                        <div class="stage-title">主持人格式化题目</div>
+                        <div class="stage-subtitle" id="stage0-subtitle">等待输入...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage0-content">
-                    等待输入...
+                    <div class="detail-section">
+                        <h3>📋 题目信息</h3>
+                        <div class="question-info" id="question-info">
+                            <div class="info-item">
+                                <div class="info-label">标题</div>
+                                <div class="info-value" id="info-title">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">难度</div>
+                                <div class="info-value" id="info-difficulty">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">平台</div>
+                                <div class="info-value" id="info-platform">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">测试用例数</div>
+                                <div class="info-value" id="info-testcases">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>📝 格式化后的问题 <button class="copy-btn" onclick="copyFormattedQuestion()">📋 复制</button></h3>
+                        <div class="member-content" id="formatted-question"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>🧪 测试用例 <button class="copy-btn" onclick="copyTestCases()">📋 复制</button></h3>
+                        <div id="test-cases-container"></div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Stage 1 -->
             <div class="stage-card" id="stage1">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(1)">
                     <span class="stage-number">1</span>
-                    <span class="stage-title">成员生成解题思路</span>
+                    <div class="stage-info">
+                        <div class="stage-title">成员生成解题思路</div>
+                        <div class="stage-subtitle" id="stage1-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage1-content">
-                    等待上一步完成...
+                    <div id="ideas-container"></div>
                 </div>
             </div>
             
+            <!-- Stage 2 -->
             <div class="stage-card" id="stage2">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(2)">
                     <span class="stage-number">2</span>
-                    <span class="stage-title">投票选择最佳思路</span>
+                    <div class="stage-info">
+                        <div class="stage-title">投票选择最佳思路</div>
+                        <div class="stage-subtitle" id="stage2-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage2-content">
-                    等待上一步完成...
+                    <div class="vote-result" id="vote-result-idea" style="display: none;">
+                        <h4>🏆 投票结果</h4>
+                        <div id="vote-bars-idea"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>✅ 最佳思路 <button class="copy-btn" onclick="copyBestIdea()">📋 复制</button></h3>
+                        <div class="member-item winner">
+                            <div class="member-header">
+                                <span class="member-name winner" id="best-idea-member">成员 #</span>
+                            </div>
+                            <div class="member-content" id="best-idea-content"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Stage 3 -->
             <div class="stage-card" id="stage3">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(3)">
                     <span class="stage-number">3</span>
-                    <span class="stage-title">成员编写代码</span>
+                    <div class="stage-info">
+                        <div class="stage-title">成员编写代码</div>
+                        <div class="stage-subtitle" id="stage3-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage3-content">
-                    等待上一步完成...
+                    <div id="codes-container"></div>
                 </div>
             </div>
             
+            <!-- Stage 4 -->
             <div class="stage-card" id="stage4">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(4)">
                     <span class="stage-number">4</span>
-                    <span class="stage-title">投票选择最佳代码</span>
+                    <div class="stage-info">
+                        <div class="stage-title">投票选择最佳代码</div>
+                        <div class="stage-subtitle" id="stage4-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage4-content">
-                    等待上一步完成...
+                    <div class="vote-result" id="vote-result-code" style="display: none;">
+                        <h4>🏆 投票结果</h4>
+                        <div id="vote-bars-code"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>✅ 最佳代码 <button class="copy-btn" onclick="copyBestCode()">📋 复制</button></h3>
+                        <div class="member-item winner">
+                            <div class="member-header">
+                                <span class="member-name winner" id="best-code-member">成员 #</span>
+                            </div>
+                            <div class="code-content" id="best-code-content"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Stage 5 -->
             <div class="stage-card" id="stage5">
-                <div class="stage-header">
+                <div class="stage-header" onclick="toggleStage(5)">
                     <span class="stage-number">5</span>
-                    <span class="stage-title">主持人审查代码</span>
+                    <div class="stage-info">
+                        <div class="stage-title">主持人审查代码</div>
+                        <div class="stage-subtitle" id="stage5-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
                 </div>
                 <div class="stage-content" id="stage5-content">
-                    等待上一步完成...
+                    <div class="question-info">
+                        <div class="info-item">
+                            <div class="info-label">基于代码</div>
+                            <div class="info-value" id="review-from-code">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">代码长度</div>
+                            <div class="info-value" id="review-code-length">-</div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>🔍 审查详情 <button class="copy-btn" onclick="copyReviewDetail()">📋 复制</button></h3>
+                        <div class="member-content" id="review-detail"></div>
+                    </div>
                 </div>
             </div>
         </div>
         
         <div class="code-section" id="result-section" style="display: none;">
             <h2>✨ 最终代码</h2>
-            <div class="code-block">
+            <button class="copy-btn" onclick="copyFinalCode()" style="margin-bottom: 10px;">📋 复制代码</button>
+            <div class="final-code-block">
                 <pre id="final-code"></pre>
             </div>
         </div>
@@ -424,23 +711,28 @@
     <script>
         let isRunning = false;
         
-        function updateStage(stageNum, status, content = '') {
+        function toggleStage(num) {
+            const stage = document.getElementById('stage' + num);
+            stage.classList.toggle('expanded');
+        }
+        
+        function updateStage(stageNum, status, subtitle = '') {
             const stage = document.getElementById('stage' + stageNum);
-            const contentEl = document.getElementById('stage' + stageNum + '-content');
+            const subtitleEl = document.getElementById('stage' + stageNum + '-subtitle');
             
             stage.classList.remove('active', 'completed', 'error');
             
             if (status === 'running') {
                 stage.classList.add('active');
-                contentEl.innerHTML = content || '<div class="loading"><div class="spinner"></div> 处理中...</div>';
+                subtitleEl.innerHTML = '<div class="loading"><div class="spinner"></div> 处理中...</div>';
             } else if (status === 'completed') {
                 stage.classList.add('completed');
-                contentEl.innerHTML = content || '✅ 完成';
+                subtitleEl.textContent = subtitle || '✅ 完成';
             } else if (status === 'error') {
                 stage.classList.add('error');
-                contentEl.innerHTML = content || '❌ 错误';
+                subtitleEl.textContent = subtitle || '❌ 错误';
             } else {
-                contentEl.innerHTML = content || '等待...';
+                subtitleEl.textContent = subtitle || '等待...';
             }
         }
         
@@ -452,6 +744,148 @@
         function updateProgress(percent) {
             document.getElementById('progress').style.width = percent + '%';
         }
+        
+        function renderIdeas(data) {
+            const container = document.getElementById('ideas-container');
+            container.innerHTML = data.ideas.map((idea, idx) => `
+                <div class="member-item">
+                    <div class="member-header">
+                        <span class="member-name">成员 ${idea.member}</span>
+                        <span class="member-model">${idea.model}</span>
+                    </div>
+                    <div class="member-content">${escapeHtml(idea.idea || '<无内容>')}</div>
+                    <button class="copy-btn" onclick="copyText(this, '${escapeHtml(idea.idea || '').replace(/'/g, "\\'")}')">📋 复制</button>
+                </div>
+            `).join('');
+        }
+        
+        function renderCodes(data) {
+            const container = document.getElementById('codes-container');
+            container.innerHTML = data.codes.map((code, idx) => `
+                <div class="member-item">
+                    <div class="member-header">
+                        <span class="member-name">成员 ${code.member}</span>
+                        <span class="member-model">${code.model}</span>
+                    </div>
+                    <div class="code-content">${escapeHtml(code.code || '<无内容>')}</div>
+                    <button class="copy-btn" onclick="copyText(this, '${escapeHtml(code.code || '').replace(/'/g, "\\'")}')">📋 复制</button>
+                </div>
+            `).join('');
+        }
+        
+        function renderVoteResult(data, type) {
+            const voteResultEl = document.getElementById('vote-result-' + type);
+            const voteBarsEl = document.getElementById('vote-bars-' + type);
+            
+            if (data.votes && Object.keys(data.votes).length > 0) {
+                voteResultEl.style.display = 'block';
+                const maxVotes = Math.max(...Object.values(data.votes));
+                
+                let barsHtml = '';
+                for (let i = 1; i <= 3; i++) {
+                    const votes = data.votes[i] || 0;
+                    const percent = maxVotes > 0 ? (votes / maxVotes * 100) : 0;
+                    barsHtml += `
+                        <div class="vote-bar">
+                            <span class="vote-bar-label">成员 ${i}</span>
+                            <div class="vote-bar-fill">
+                                <div class="vote-bar-value" style="width: ${percent}%"></div>
+                            </div>
+                            <span class="vote-bar-count">${votes}票</span>
+                        </div>
+                    `;
+                }
+                voteBarsEl.innerHTML = barsHtml;
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function copyText(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '✅ 已复制';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = '📋 复制';
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                btn.textContent = '❌ 失败';
+            });
+        }
+        
+        function copyFinalCode() {
+            const code = document.getElementById('final-code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('#result-section .copy-btn');
+                btn.textContent = '✅ 已复制';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = '📋 复制代码';
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+        
+        function copyBestIdea() {
+            const text = document.getElementById('best-idea-content').textContent;
+            copyTextByText(text);
+        }
+        
+        function copyBestCode() {
+            const text = document.getElementById('best-code-content').textContent;
+            copyTextByText(text);
+        }
+        
+        function copyTextByText(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ 已复制到剪贴板');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('❌ 复制失败');
+            });
+        }
+        
+        function copyTestCases() {
+            const testCasesEl = document.getElementById('test-cases-container');
+            const text = testCasesEl.textContent;
+            copyTextByText(text);
+        }
+        
+        function copyFormattedQuestion() {
+            const text = document.getElementById('formatted-question').textContent;
+            copyTextByText(text);
+        }
+        
+        function copyReviewDetail() {
+            const text = document.getElementById('review-detail').textContent;
+            copyTextByText(text);
+        }
+        
+        function renderTestCases(testCases) {
+            const container = document.getElementById('test-cases-container');
+            if (!testCases || testCases.length === 0) {
+                container.innerHTML = '<div class="member-content">无测试用例</div>';
+                return;
+            }
+            container.innerHTML = testCases.map((tc, idx) => `
+                <div class="test-case">
+                    <span class="test-case-label">用例 ${idx + 1}:</span>
+                    <div class="test-case-content">输入: ${escapeHtml(tc.input || '')}</div>
+                    <div class="test-case-content">输出: ${escapeHtml(tc.output || '')}</div>
+                </div>
+            `).join('');
+        }
+        
+        
         
         async function runSystem() {
             const question = document.getElementById('question-input').value.trim();
@@ -471,8 +905,12 @@
             // Reset stages
             for (let i = 0; i <= 5; i++) {
                 updateStage(i, 'pending', '等待...');
+                document.getElementById('stage' + i).classList.remove('expanded');
             }
             document.getElementById('result-section').style.display = 'none';
+            
+            // Stage 0 expand by default
+            document.getElementById('stage0').classList.add('expanded');
             
             updateStatus('正在启动系统...', true);
             updateProgress(0);
@@ -491,15 +929,23 @@
                 const stage0Data = await stage0Res.json();
                 
                 if (stage0Data.success) {
-                    updateStage(0, 'completed', `✅ 格式化完成<br>标题: ${stage0Data.title || 'N/A'}<br>提取测试用例: ${stage0Data.test_cases_count || 0}个`);
+                    updateStage(0, 'completed', `✅ ${stage0Data.title || '格式化完成'}`);
+                    // Update stage 0 details
+                    document.getElementById('info-title').textContent = stage0Data.title || '-';
+                    document.getElementById('info-difficulty').textContent = stage0Data.difficulty || '-';
+                    document.getElementById('info-platform').textContent = stage0Data.platform || '-';
+                    document.getElementById('info-testcases').textContent = stage0Data.test_cases_count || 0;
+                    document.getElementById('formatted-question').textContent = stage0Data.full_question || question;
+                    renderTestCases(stage0Data.test_cases);
                 } else {
                     updateStage(0, 'completed', '✅ 使用原始问题');
+                    document.getElementById('formatted-question').textContent = question;
                 }
                 updateProgress(20);
                 
                 // Stage 1: Generate ideas
                 updateStage(1, 'running', '正在生成解题思路...');
-                updateStatus('步骤1: 成员生成解题思路', true);
+  updateStatus('步骤1: 成员生成解题思路', true);
                 updateProgress(30);
                 
                 const stage1Res = await fetch('/api/ideas', {
@@ -510,7 +956,8 @@
                 const stage1Data = await stage1Res.json();
                 
                 if (stage1Data.success) {
-                    updateStage(1, 'completed', `✅ 生成完成<br>有效思路: ${stage1Data.count}个`);
+                    updateStage(1, 'completed', `✅ ${stage1Data.count}个思路`);
+                    renderIdeas(stage1Data);
                 } else {
                     updateStage(1, 'error', '❌ ' + stage1Data.error);
                 }
@@ -529,7 +976,10 @@
                 const stage2Data = await stage2Res.json();
                 
                 if (stage2Data.success) {
-                    updateStage(2, 'completed', `✅ 投票完成<br>最佳方案: #${stage2Data.best_idx}`);
+                    updateStage(2, 'completed', `✅ 最佳方案 #${stage2Data.best_idx}`);
+                    document.getElementById('best-idea-member').textContent = '成员 #' + stage2Data.best_idx;
+                    document.getElementById('best-idea-content').textContent = stage2Data.best_idea || '';
+                    renderVoteResult(stage2Data, 'idea');
                 } else {
                     updateStage(2, 'error', '❌ ' + stage2Data.error);
                 }
@@ -548,7 +998,8 @@
                 const stage3Data = await stage3Res.json();
                 
                 if (stage3Data.success) {
-                    updateStage(3, 'completed', `✅ 代码生成完成<br>有效代码: ${stage3Data.count}个`);
+                    updateStage(3, 'completed', `✅ ${stage3Data.count}份代码`);
+                    renderCodes(stage3Data);
                 } else {
                     updateStage(3, 'error', '❌ ' + stage3Data.error);
                 }
@@ -567,7 +1018,10 @@
                 const stage4Data = await stage4Res.json();
                 
                 if (stage4Data.success) {
-                    updateStage(4, 'completed', `✅ 投票完成<br>最佳代码: #${stage4Data.best_idx}`);
+                    updateStage(4, 'completed', `✅ 最佳代码 #${stage4Data.best_idx}`);
+                    document.getElementById('best-code-member').textContent = '成员 #' + stage4Data.best_idx;
+                    document.getElementById('best-code-content').textContent = stage4Data.best_code || '';
+                    renderVoteResult(stage4Data, 'code');
                 } else {
                     updateStage(4, 'error', '❌ ' + stage4Data.error);
                 }
@@ -586,6 +1040,9 @@
                 
                 if (stage5Data.success) {
                     updateStage(5, 'completed', '✅ 审查完成');
+                    document.getElementById('review-from-code').textContent = '成员 #' + stage5Data.best_code_idx;
+                    document.getElementById('review-code-length').textContent = stage5Data.code_length + ' 字符';
+                    document.getElementById('review-detail').textContent = stage5Data.review_detail || '无详细日志';
                     document.getElementById('final-code').textContent = stage5Data.code;
                     document.getElementById('result-section').style.display = 'block';
                 } else {

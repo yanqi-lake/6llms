@@ -1,37 +1,31 @@
-#include <iostream>
+#include <bits/stdc++.h>
 using namespace std;
 
-typedef long long ll;
-
-ll mul_mod(ll a, ll b, ll mod) {
-    return (__int128)a * b % mod;
-}
-
-ll pow_mod(ll base, ll exp, ll mod) {
-    ll result = 1;
-    while (exp) {
-        if (exp & 1) result = mul_mod(result, base, mod);
-        base = mul_mod(base, base, mod);
-        exp >>= 1;
-    }
-    return result;
-}
+struct Carpet {
+    long long a, b, g, k;
+};
 
 int main() {
-    ll N, K, M, P;
-    cin >> N >> K >> M >> P;
-
-    if (K == 1) {
-        cout << N % P << endl;
-        return 0;
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    int n;
+    if (!(cin >> n)) return 0;
+    vector<Carpet> carpets(n);
+    for (int i = 0; i < n; ++i) {
+        long long a, b, g, k;
+        cin >> a >> b >> g >> k;
+        carpets[i] = {a, b, g, k};
     }
-
-    ll mod = 2 * P;
-    ll power = pow_mod(M, K - 1, mod);
-    ll X = (2 * (N % mod) % mod - mul_mod(K - 1, M + 1, mod) + mod) % mod;
-    ll result = mul_mod(power, X, mod);
-    result = (result % mod + mod) % mod / 2;
-    cout << result % P << endl;
-
+    long long x, y;
+    cin >> x >> y;
+    int ans = -1;
+    for (int i = n - 1; i >= 0; --i) {
+        const auto &c = carpets[i];
+        if (x >= c.a && x <= c.a + c.g && y >= c.b && y <= c.b + c.k) {
+            ans = i + 1;
+            break;
+        }
+    }
+    cout << ans;
     return 0;
 }

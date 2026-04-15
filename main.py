@@ -813,7 +813,7 @@ def parse_testcases_from_response(response):
 
 def run_test_cases(code, test_cases, timeout=30):
     """
-    运行测试用例
+    运行测试用例 - 每个测试用例单独编译和运行
     
     Args:
         code: C++ 源代码
@@ -836,30 +836,50 @@ def run_test_cases(code, test_cases, timeout=30):
         result["success"] = True
         return result
     
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src_file = Path(tmpdir) / "solution.cpp"
-        exe_file = Path(tmpdir) / "solution"
+    # 每个测试用例单独编译和运行，避免状态污染
+    for idx, tc in enumerate(test_cases):
+        print(f"\n[TEST DEBUG] ===== 处理测试用例 {idx + 1}/{len(test_cases)} =====")
         
-        with open(src_file, "w", encoding="utf-8") as f:
-            f.write(code)
-        
-        # 编译
-        compile_result = subprocess.run(
-            ["g++", str(src_file), "-o", str(exe_file), "-std=c++17"],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        
-        if compile_result.returncode != 0:
-            return result
-        
-        # 运行每个测试用例
-        for tc in test_cases:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_file = Path(tmpdir) / "solution.cpp"
+            exe_file = Path(tmpdir) / "solution"
+            
+            # 写入代码
+            with open(src_file, "w", encoding="utf-8") as f:
+                f.write(code)
+            
+            # 编译
+            compile_result = subprocess.run(
+                ["g++", str(src_file), "-o", str(exe_file), "-std=c++17"],
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            print(f"[TEST DEBUG] 编译 returncode: {compile_result.returncode}")
+            if compile_result.returncode != 0:
+                print(f"[TEST DEBUG] 编译错误: {compile_result.stderr}")
+                result["test_results"].append({
+                    "input": tc.get("input", ""),
+                    "expected": tc.get("output", ""),
+                    "actual": "COMPILE_ERROR: " + compile_result.stderr,
+                    "passed": False
+                })
+                continue
+            
+            # 运行测试用例
             try:
+                # 修复输入中的 \\n -> \n (JSON解析导致的问题)
+                raw_input = tc.get("input", "")
+                input_str = raw_input.replace('\\n', '\n') + '\n'
+                
+                print(f"[TEST DEBUG] ===== 测试用例开始 =====")
+                print(f"[TEST DEBUG] input_str: {repr(input_str)}")
+                print(f"[TEST DEBUG] expected output: {repr(tc.get('output', ''))}")
+                
                 run_result = subprocess.run(
                     [str(exe_file)],
-                    input=tc.get("input", ""),
+                    input=input_str,
                     capture_output=True,
                     text=True,
                     timeout=timeout
@@ -868,12 +888,18 @@ def run_test_cases(code, test_cases, timeout=30):
                 actual_output = run_result.stdout.strip()
                 expected_output = tc.get("output", "").strip()
                 
-                # 规范化输出：移除多余空白，处理多行输出
+                print(f"[TEST DEBUG] actual output: {repr(actual_output)}")
+                print(f"[TEST DEBUG] ===== 测试用例结束 =====")
+                
+                # 比较结果
+                actual_normalized = actual_output.rstrip('\n')
+                expected_normalized = expected_output.rstrip('\n')
+                
                 actual_lines = [line.strip() for line in actual_output.split('\n') if line.strip()]
                 expected_lines = [line.strip() for line in expected_output.split('\n') if line.strip()]
                 
-                # 比较时忽略行尾空白和多余换行
-                test_passed = actual_output == expected_output or actual_lines == expected_lines
+                test_passed = actual_normalized == expected_normalized or actual_lines == expected_lines
+                print(f"[TEST DEBUG] passed: {test_passed}")
                 
                 result["test_results"].append({
                     "input": tc.get("input", ""),
