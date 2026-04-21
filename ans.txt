@@ -1,31 +1,38 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-struct Carpet {
-    long long a, b, g, k;
-};
-
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    int n;
-    if (!(cin >> n)) return 0;
-    vector<Carpet> carpets(n);
-    for (int i = 0; i < n; ++i) {
-        long long a, b, g, k;
-        cin >> a >> b >> g >> k;
-        carpets[i] = {a, b, g, k};
+    vector<int> a;
+    int x;
+    while (cin >> x) {
+        a.push_back(x);
     }
-    long long x, y;
-    cin >> x >> y;
-    int ans = -1;
-    for (int i = n - 1; i >= 0; --i) {
-        const auto &c = carpets[i];
-        if (x >= c.a && x <= c.a + c.g && y >= c.b && y <= c.b + c.k) {
-            ans = i + 1;
-            break;
-        }
+    if (a.empty()) {
+        cout << 0 << "\n" << 0 << "\n";
+        return 0;
     }
-    cout << ans;
+
+    vector<int> tail1;
+    tail1.reserve(a.size());
+    for (int v : a) {
+        int y = -v;
+        auto it = upper_bound(tail1.begin(), tail1.end(), y);
+        if (it == tail1.end()) tail1.push_back(y);
+        else *it = y;
+    }
+    int lnnis_len = (int)tail1.size();
+
+    vector<int> tail2;
+    tail2.reserve(a.size());
+    for (int v : a) {
+        auto it = lower_bound(tail2.begin(), tail2.end(), v);
+        if (it == tail2.end()) tail2.push_back(v);
+        else *it = v;
+    }
+    int lis_len = (int)tail2.size();
+
+    cout << lnnis_len << "\n" << lis_len << "\n";
     return 0;
 }

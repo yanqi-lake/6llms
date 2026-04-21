@@ -33,6 +33,7 @@ from prompts import (
     PROMPT_HOST_CLEANUP_CODE,
     PROMPT_HOST_GENERATE_TESTCASES,
     PROMPT_RETURN_TO_MEMBER,
+    PROMPT_REFINE_CODE,
     PROMPT_REVIEW_TESTCASES
 )
 
@@ -420,6 +421,61 @@ def generate_codes(question, solution):
     return codes, failed_members
 
 
+def refine_code(question, current_code, test_cases, expected_output, actual_output, error_analysis):
+    """
+    成员根据问题分析修复代码
+    
+    Args:
+        question: 题目描述
+        current_code: 当前需要修复的代码
+        test_cases: 测试用例文本
+        expected_output: 预期输出
+        actual_output: 实际输出
+        error_analysis: 问题分析结果
+    
+    Returns:
+        tuple: (修复后的代码列表, 失败的成员索引列表)
+    """
+    codes = [None] * MEMBER_COUNT
+    failed_members = []
+    
+    print("\n    成员根据问题分析修复代码...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MEMBER_COUNT) as executor:
+        future_to_index = {}
+        for i in range(MEMBER_COUNT):
+            messages = [
+                {"role": "system", "content": SYSTEM_MEMBER},
+                {"role": "user", "content": PROMPT_REFINE_CODE.format(
+                    question=question,
+                    code=current_code,
+                    error_analysis=error_analysis,
+                    test_cases=test_cases,
+                    expected_output=expected_output,
+                    actual_output=actual_output
+                )}
+            ]
+            future_to_index[executor.submit(call_member_api, messages, i)] = i
+
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result and result.strip():
+                    codes[idx] = result
+                else:
+                    model_name = MODELS[idx + 1]
+                    print(f"警告：成员 {idx+1}（模型：{model_name}）返回了空内容")
+                    failed_members.append(idx)
+            except Exception as e:
+                model_name = MODELS[idx + 1]
+                print(f"❌ 成员 {idx+1}（模型：{model_name}）修复代码失败: {e}")
+                failed_members.append(idx)
+                codes[idx] = ""
+    
+    return codes, failed_members
+
+
 def select_best_code(codes, failed_members=None):
     """
     步骤4：成员投票选出最佳代码
@@ -674,12 +730,28 @@ def host_review_code_simple(best_code, best_idx, question, test_cases, question_
                     log_message("问题分析", analyze_response)
                     print(f"    分析: {analyze_response[:150]}...")
                 except:
-                    pass
+                    analyze_response = "无法分析问题"
                 
-                # 如果还有轮次，让成员重新生成
+                # 如果还有轮次，让成员根据问题分析修复代码
                 if round_num < max_refine_rounds:
-                    print(f"  正在让成员重新生成代码...")
-                    new_codes, _ = generate_codes(question_to_use if question_to_use else question, current_best_idea)
+                    print(f"  正在让成员根据问题分析修复代码...")
+                    # 构建测试用例文本
+                    test_cases_text = ""
+                    for i, tc in enumerate(test_cases):
+                        test_cases_text += f"测试用例{i+1}:\n输入:\n{tc.get('input', '')}\n预期输出:\n{tc.get('output', '')}\n\n"
+                    
+                    # 构建预期输出和实际输出
+                    expected_text = "\n".join([tr['expected'] for tr in run_result['test_results'] if not tr['passed']])
+                    actual_text = "\n".join([tr['actual'] for tr in run_result['test_results'] if not tr['passed']])
+                    
+                    new_codes, _ = refine_code(
+                        question_to_use if question_to_use else question,
+                        current_code,
+                        test_cases_text,
+                        expected_text,
+                        actual_text,
+                        analyze_response
+                    )
                     new_best_idx = select_best_code(new_codes)
                     current_code = new_codes[new_best_idx - 1]
                 else:
@@ -802,6 +874,8 @@ def parse_testcases_from_response(response):
             output = output_match.group(1).strip()
             # 清理输出中的反引号和 markdown 标记
             output = re.sub(r'```', '', output).strip()
+            # 修复 \n -> 换行符 (JSON解析导致的问题)
+            output = output.replace('\\n', '\n')
             
             test_cases.append({
                 "input": input_match.group(1).strip(),
@@ -886,7 +960,7 @@ def run_test_cases(code, test_cases, timeout=30):
                 )
                 
                 actual_output = run_result.stdout.strip()
-                expected_output = tc.get("output", "").strip()
+                expected_output = tc.get("output", "").replace('\\n', '\n').strip()
                 
                 print(f"[TEST DEBUG] actual output: {repr(actual_output)}")
                 print(f"[TEST DEBUG] ===== 测试用例结束 =====")
@@ -978,26 +1052,36 @@ def return_to_members_and_refine(code, question, test_cases, generated_tc,
         expected_text = "\n".join([tr['expected'] for tr in run_result['test_results'] + generated_run_result['test_results'] if not tr['passed']])
         actual_text = "\n".join([tr['actual'] for tr in run_result['test_results'] + generated_run_result['test_results'] if not tr['passed']])
         
-        # 调用成员修复
-        prompt = PROMPT_RETURN_TO_MEMBER.format(
+        # 调用问题分析
+        error_summary = f"测试用例结果：\n预期输出：\n{expected_text}\n\n实际输出：\n{actual_text}"
+        
+        analyze_prompt = PROMPT_ANALYZE_ERROR.format(
             question=question,
             code=current_code,
-            test_cases=test_cases_text,
-            expected_output=expected_text,
-            actual_output=actual_text
+            error_summary=error_summary
         )
         
-        log_message(f"第{round_num}轮-返回给成员修复", 
-                   f"题目：{question}\n\n当前代码：\n{current_code}\n\n测试用例：\n{test_cases_text}\n\n预期输出：\n{expected_text}\n\n实际输出：\n{actual_text}")
+        try:
+            analyze_response = call_api(
+                [{"role": "system", "content": SYSTEM_MEMBER},
+                 {"role": "user", "content": analyze_prompt}],
+                model=MODELS[0]
+            )
+            log_message(f"第{round_num}轮-问题分析", analyze_response)
+            print(f"    分析: {analyze_response[:150]}...")
+        except:
+            analyze_response = "无法分析问题"
         
-        messages = [
-            {"role": "system", "content": SYSTEM_MEMBER},
-            {"role": "user", "content": prompt}
-        ]
-        
-        # 重新让所有成员生成代码（使用之前保存的最佳思路）
-        print(f"    正在让所有成员重新生成代码...")
-        new_codes, failed_members = generate_codes(question_to_use if question_to_use else question, current_best_idea if current_best_idea else "")
+        # 重新让所有成员根据问题分析修复代码
+        print(f"    正在让所有成员根据问题分析修复代码...")
+        new_codes, failed_members = refine_code(
+            question_to_use if question_to_use else question,
+            current_code,
+            test_cases_text,
+            expected_text,
+            actual_text,
+            analyze_response
+        )
         
         # 投票选出新最佳代码
         print(f"    正在投票选出新最佳代码...")
