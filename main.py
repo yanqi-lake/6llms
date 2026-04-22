@@ -34,7 +34,18 @@ from prompts import (
     PROMPT_HOST_GENERATE_TESTCASES,
     PROMPT_RETURN_TO_MEMBER,
     PROMPT_REFINE_CODE,
-    PROMPT_REVIEW_TESTCASES
+    PROMPT_REVIEW_TESTCASES,
+    # 新增：步骤1.5
+    PROMPT_SHOW_IDEAS,
+    PROMPT_ASK_QUESTIONS,
+    PROMPT_ANSWER_QUESTIONS,
+    # 新增：步骤1.6
+    PROMPT_IMPROVE_IDEA,
+    # 新增：步骤3.5
+    PROMPT_ASK_CODE_QUESTIONS,
+    PROMPT_ANSWER_CODE_QUESTIONS,
+    # 新增：步骤3.6
+    PROMPT_IMPROVE_CODE,
 )
 
 
@@ -294,6 +305,248 @@ def get_ideas(question):
     return ideas, failed_members
 
 
+# ========================================
+# 步骤1.5: 思路展示 + 交叉提问
+# ========================================
+
+def show_ideas_and_qa(ideas, failed_members=None):
+    """
+    步骤1.5：展示思路 + 成员交叉提问 + 回答问题
+    
+    Args:
+        ideas: 所有成员的解题思路列表
+        failed_members: 失败的成员索引列表
+    
+    Returns:
+        tuple: (改进后的思路列表, 问答记录)
+    """
+    if failed_members is None:
+        failed_members = []
+    
+    # 获取有效成员索引
+    valid_members = [i for i in range(MEMBER_COUNT) 
+                    if i not in failed_members and ideas[i] and ideas[i].strip()]
+    
+    if not valid_members:
+        raise ValueError("没有有效的思路可供展示")
+    
+    print("\n[步骤1.5] 思路展示 + 交叉提问...")
+    
+    # ==== 1.5A: 展示思路给所有成员 ====
+    print("  1.5A: 广播思路给所有成员...")
+    all_ideas_text = "\n\n".join([
+        f"思路{i+1}（成员{i+1}）：{ideas[i]}" 
+        for i in valid_members
+    ])
+    save_detail("stage1_5", all_ideas_text, "all_ideas_broadcast")
+    
+    # ==== 1.5B: 成员并行提问 ====
+    print("  1.5B: 成员并行提问...")
+    
+    # 构建每个成员的可见思路（排除自己的）
+    def get_other_ideas_text(member_idx):
+        other_ideas = []
+        for j in valid_members:
+            if j != member_idx:
+                other_ideas.append(f"思路{j+1}（成员{j+1}）：{ideas[j]}")
+        return "\n\n".join(other_ideas)
+    
+    def call_ask_questions(member_idx):
+        other_ideas_text = get_other_ideas_text(member_idx)
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_ASK_QUESTIONS.format(
+                all_ideas=all_ideas_text + "\n\n" + other_ideas_text)}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    questions_result = [None] * MEMBER_COUNT  # questions_result[member_idx] = "该成员提出的问题"
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_ask_questions, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result and result.strip() and result.strip() != "无":
+                    questions_result[idx] = result
+                    print(f"  成员 {idx+1} 提出了问题")
+            except Exception as e:
+                print(f"  成员 {idx+1} 提问失败: {e}")
+    
+    # 汇总所有问题，按思路分组
+    # questions_by_idea[被提问的思路索引] = [问题列表]
+    questions_by_idea = {i: [] for i in valid_members}
+    for asker_idx in valid_members:
+        q_text = questions_result[asker_idx]
+        if q_text and q_text.strip():
+            # 将问题分配给其他思路（轮询分配或随机分配）
+            for target_idx in valid_members:
+                if target_idx != asker_idx:
+                    lines = q_text.strip().split('\n')
+                    for line in lines[:2]:  # 最多2个问题
+                        if line.strip():
+                            questions_by_idea[target_idx].append(f"成员{asker_idx+1}问: {line.strip()}")
+    
+    # 整合每个思路收到的所有问题
+    all_questions_text = "\n".join([
+        f"思路{i+1}（成员{i+1}）收到的问题：\n" + "\n".join(questions_by_idea[i])
+        for i in valid_members if questions_by_idea[i]
+    ])
+    save_detail("stage1_5", all_questions_text, "all_questions")
+    
+    # ==== 1.5C: 成员并行回答问题 ====
+    print("  1.5C: 成员并行回答问题...")
+    
+    def call_answer_questions(member_idx):
+        target_questions = questions_by_idea.get(member_idx, [])
+        if not target_questions:
+            return ""
+        questions_str = "\n".join(target_questions)
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_ANSWER_QUESTIONS.format(
+                questions=questions_str,
+                your_idea=ideas[member_idx])}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    answers_result = [None] * MEMBER_COUNT
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_answer_questions, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result:
+                    answers_result[idx] = result
+                    print(f"  成员 {idx+1} 回答了问题")
+            except Exception as e:
+                print(f"  成员 {idx+1} 回答问题失败: {e}")
+    
+    # 构建问答记录
+    qa_record = []
+    for i in valid_members:
+        q_list = questions_by_idea.get(i, [])
+        a_text = answers_result[i] if answers_result[i] else ""
+        qa_record.append({
+            'member': i + 1,
+            'questions': q_list,
+            'answers': a_text
+        })
+    
+    qa_text = "\n\n".join([
+        f"成员{rec['member']} 收到的问题：\n" + "\n".join(rec['questions']) + "\n回答：" + rec['answers']
+        for rec in qa_record
+    ])
+    save_detail("stage1_5", qa_text, "qa_record")
+    
+    return qa_record
+
+
+def improve_ideas(ideas, qa_record, failed_members=None):
+    """
+    步骤1.6：成员改进思路
+    
+    Args:
+        ideas: 所有成员的解题思路列表
+        qa_record: 问答记录
+        failed_members: 失败的成员索引列表
+    
+    Returns:
+        list: 改进后的思路列表
+    """
+    if failed_members is None:
+        failed_members = []
+    
+    valid_members = [i for i in range(MEMBER_COUNT) 
+                   if i not in failed_members and ideas[i] and ideas[i].strip()]
+    
+    if not valid_members:
+        return ideas
+    
+    print("\n[步骤1.6] 成员改进思路...")
+    
+    # 构建完整的上下文信息
+    all_ideas_and_qa = []
+    for rec in qa_record:
+        idx = rec['member'] - 1
+        q_text = "\n".join(rec['questions']) if rec['questions'] else "无"
+        a_text = rec['answers'] if rec['answers'] else "无"
+        all_ideas_and_qa.append(
+            f"成员{rec['member']} 的思路：{ideas[idx]}\n"
+            f"收到的问题：{q_text}\n回答：{a_text}"
+        )
+    all_ideas_and_qa_text = "\n\n".join(all_ideas_and_qa)
+    
+    def call_improve(member_idx):
+        # 获取该成员收到的问答
+        member_qa = []
+        for rec in qa_record:
+            if rec['member'] - 1 == member_idx:
+                q_text = "\n".join(rec['questions']) if rec['questions'] else "无"
+                a_text = rec['answers'] if rec['answers'] else "无"
+                member_qa.append(
+                    f"你在问答环节收到的问题：{q_text}\n你的回答：{a_text}"
+                )
+        
+        my_questions = "\n".join(member_qa) if member_qa else "无"
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_IMPROVE_IDEA.format(
+                your_idea=ideas[member_idx],
+                all_ideas_and_qa=all_ideas_and_qa_text)}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    improved_ideas = ideas.copy()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_improve, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result and result.strip():
+                    # 尝试提取改进后的思路
+                    improved = result
+                    if "改进后的思路：" in result:
+                        # 提取改进内容
+                        import re
+                        match = re.search(r'改进后的思路：(.+?)(?:---|$)', result, re.DOTALL)
+                        if match:
+                            improved = match.group(1).strip()
+                            if improved == "无":
+                                improved = ideas[idx]  # 保持原版
+                    
+                    improved_ideas[idx] = improved
+                    print(f"  成员 {idx+1} 处理了改进流程")
+                else:
+                    print(f"  成员 {idx+1} 改进为空，保持原版")
+            except Exception as e:
+                print(f"  成员 {idx+1} 改进失败: {e}")
+    
+    # 保存改进后的思路
+    improved_text = "\n\n".join([
+        f"成员{i+1}: {improved_ideas[i]}" if improved_ideas[i] else f"成员{i+1}: <空>"
+        for i in range(len(improved_ideas))
+    ])
+    save_detail("stage1_6", improved_text, "improved_ideas")
+    
+    return improved_ideas
+
+
 def select_best_idea(ideas, failed_members=None):
     """
     步骤2：成员投票选出最佳思路
@@ -417,8 +670,266 @@ def generate_codes(question, solution):
     # 保存代码结果
     codes_text = "\n\n".join([f"成员 {i+1} 代码:\n{codes[i]}" if codes[i] else f"成员 {i+1}: <空>" for i in range(len(codes))])
     save_detail("stage3", codes_text, "all_codes")
-    
+
     return codes, failed_members
+
+
+# ========================================
+# 步骤3.5: 代码展示 + 交叉提问 + 回答
+# ========================================
+
+def show_codes_and_qa(codes, question_data, failed_members=None):
+    """
+    步骤3.5：展示代码 + 成员交叉提问 + 回答问题
+    
+    Args:
+        codes: 所有成员的代码列表
+        question_data: 题目信息（包含输入输出格式、数据范围等）
+        failed_members: 失败的成员索引列表
+    
+    Returns:
+        tuple: (问答记录, 每个成员收到的所有问题)
+    """
+    if failed_members is None:
+        failed_members = []
+    
+    # 获取有效成员索引
+    valid_members = [i for i in range(MEMBER_COUNT) 
+                    if i not in failed_members and codes[i] and codes[i].strip()]
+    
+    if not valid_members:
+        raise ValueError("没有有效的代码可供展示")
+    
+    print("\n[步骤3.5] 代码展示 + 交叉提问...")
+    
+    # 提取题目信息
+    input_format = question_data.get('input_format', '未提供')
+    output_format = question_data.get('output_format', '未提供')
+    constraints = question_data.get('constraints', '未提供')
+    max_input = question_data.get('max_input', '未提供')
+    question_content = question_data.get('question_content', question_data.get('question', ''))
+    
+    # ==== 3.5A: 广播代码给所有成员 ====
+    print("  3.5A: 广播代码给所有成员...")
+    all_codes_text = "\n\n".join([
+        f"代码{i+1}（成员{i+1}）：\n{codes[i]}" 
+        for i in valid_members
+    ])
+    save_detail("stage3_5", all_codes_text, "all_codes_broadcast")
+    
+    # ==== 3.5B: 成员并行提问 ====
+    print("  3.5B: 成员并行提问...")
+    
+    # 构建每个成员的可见代码（排除自己的）
+    def get_other_codes_text(member_idx):
+        other_codes = []
+        for j in valid_members:
+            if j != member_idx:
+                other_codes.append(f"代码{j+1}（成员{j+1}）：\n{codes[j]}")
+        return "\n\n".join(other_codes)
+    
+    def call_ask_questions(member_idx):
+        other_codes_text = get_other_codes_text(member_idx)
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_ASK_CODE_QUESTIONS.format(
+                input_format=input_format,
+                output_format=output_format,
+                constraints=constraints,
+                max_input=max_input,
+                all_codes=all_codes_text + "\n\n" + other_codes_text)}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    questions_result = [None] * MEMBER_COUNT
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_ask_questions, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result and result.strip() and result.strip() != "无":
+                    questions_result[idx] = result
+                    print(f"  成员 {idx+1} 提出了问题")
+            except Exception as e:
+                print(f"  成员 {idx+1} 提问失败: {e}")
+    
+    # 汇总所有问题，按代码分组
+    questions_by_code = {i: [] for i in valid_members}
+    for asker_idx in valid_members:
+        q_text = questions_result[asker_idx]
+        if q_text and q_text.strip():
+            # 将问题分配给其他代码（轮询分配或随机分配）
+            for target_idx in valid_members:
+                if target_idx != asker_idx:
+                    lines = q_text.strip().split('\n')
+                    for line in lines[:2]:  # 最多2个问题
+                        if line.strip():
+                            questions_by_code[target_idx].append(f"成员{asker_idx+1}问: {line.strip()}")
+    
+    # 整合每个代码收到的所有问题
+    all_questions_text = "\n".join([
+        f"代码{i+1}（成员{i+1}）收到的问题：\n" + "\n".join(questions_by_code[i])
+        for i in valid_members if questions_by_code[i]
+    ])
+    save_detail("stage3_5", all_questions_text, "all_questions")
+    
+    # ==== 3.5C: 成员并行回答问题 ====
+    print("  3.5C: 成员并行回答问题...")
+    
+    def call_answer_questions(member_idx):
+        target_questions = questions_by_code.get(member_idx, [])
+        if not target_questions:
+            return ""
+        questions_str = "\n".join(target_questions)
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_ANSWER_CODE_QUESTIONS.format(
+                questions=questions_str,
+                your_code=codes[member_idx])}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    answers_result = [None] * MEMBER_COUNT
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_answer_questions, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result:
+                    answers_result[idx] = result
+                    print(f"  成员 {idx+1} 回答了问题")
+            except Exception as e:
+                print(f"  成员 {idx+1} 回答问题失败: {e}")
+    
+    # 构建问答记录
+    qa_record = []
+    for i in valid_members:
+        q_list = questions_by_code.get(i, [])
+        a_text = answers_result[i] if answers_result[i] else ""
+        qa_record.append({
+            'member': i + 1,
+            'questions': q_list,
+            'answers': a_text
+        })
+    
+    qa_text = "\n\n".join([
+        f"成员{rec['member']} 收到的问题：\n" + "\n".join(rec['questions']) + "\n回答：" + rec['answers']
+        for rec in qa_record
+    ])
+    save_detail("stage3_5", qa_text, "qa_record")
+    
+    return qa_record, questions_by_code
+
+
+def improve_codes(codes, qa_record, question_data, failed_members=None):
+    """
+    步骤3.6：成员改进代码
+    
+    Args:
+        codes: 所有成员的代码列表
+        qa_record: 问答记录
+        question_data: 题目信息
+        failed_members: 失败的成员索引列表
+    
+    Returns:
+        list: 改进后的代码列表
+    """
+    if failed_members is None:
+        failed_members = []
+    
+    valid_members = [i for i in range(MEMBER_COUNT) 
+                   if i not in failed_members and codes[i] and codes[i].strip()]
+    
+    if not valid_members:
+        return codes
+    
+    print("\n[步骤3.6] 成员改进代码...")
+    
+    # 构建完整的上下文信息
+    all_codes_and_qa = []
+    for rec in qa_record:
+        idx = rec['member'] - 1
+        q_text = "\n".join(rec['questions']) if rec['questions'] else "无"
+        a_text = rec['answers'] if rec['answers'] else "无"
+        all_codes_and_qa.append(
+            f"成员{rec['member']} 的代码：\n{codes[idx]}\n"
+            f"收到的问题：{q_text}\n回答：{a_text}"
+        )
+    all_codes_and_qa_text = "\n\n".join(all_codes_and_qa)
+    
+    def call_improve(member_idx):
+        # 获取该成员收到的问答
+        member_qa = []
+        for rec in qa_record:
+            if rec['member'] - 1 == member_idx:
+                q_text = "\n".join(rec['questions']) if rec['questions'] else "无"
+                a_text = rec['answers'] if rec['answers'] else "无"
+                member_qa.append(
+                    f"你在问答环节收到的问题：{q_text}\n你的回答：{a_text}"
+                )
+        
+        my_questions = "\n".join(member_qa) if member_qa else "无"
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_MEMBER},
+            {"role": "user", "content": PROMPT_IMPROVE_CODE.format(
+                your_code=codes[member_idx],
+                all_codes_and_qa=all_codes_and_qa_text)}
+        ]
+        return call_member_api(messages, member_idx)
+    
+    improved_codes = codes.copy()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_members)) as executor:
+        future_to_index = {}
+        for idx in valid_members:
+            future_to_index[executor.submit(call_improve, idx)] = idx
+        
+        for future in concurrent.futures.as_completed(future_to_index):
+            idx = future_to_index[future]
+            try:
+                result = future.result()
+                if result and result.strip():
+                    # 尝试提取改进后的代码
+                    improved = result
+                    if "改进后的代码：" in result:
+                        # 提取改进内容
+                        import re
+                        match = re.search(r'改进后的代码：(.+?)(?:---|$)', result, re.DOTALL)
+                        if match:
+                            improved = match.group(1).strip()
+                            if improved == "无":
+                                improved = codes[idx]  # 保持原版
+                    
+                    # 如果提取失败但有代码内容，则使用原始结果
+                    if improved and improved not in ["无", codes[idx]]:
+                        improved_codes[idx] = improved
+                        print(f"  成员 {idx+1} 改进了代码")
+                    else:
+                        print(f"  成员 {idx+1} 保持原代码")
+                else:
+                    print(f"  成员 {idx+1} 改进返回空内容，保持原代码")
+            except Exception as e:
+                print(f"  成员 {idx+1} 改进代码失败: {e}")
+    
+    # 保存改进后的代码
+    improved_text = "\n\n".join([
+        f"成员 {i+1} 代码:\n{improved_codes[i]}" if improved_codes[i] else f"成员 {i+1}: <空>"
+        for i in range(len(improved_codes))
+    ])
+    save_detail("stage3_6", improved_text, "improved_codes")
+    
+    return improved_codes
 
 
 def refine_code(question, current_code, test_cases, expected_output, actual_output, error_analysis):
@@ -603,6 +1114,20 @@ def solve_problem(question, test_cases=None):
         else:
             print(f"  成员 {i+1} 思路：<空>")
 
+    # 步骤1.5：思路展示 + 交叉提问 + 回答
+    print("\n[步骤1.5] 思路展示 + 交叉提问...")
+    qa_record = show_ideas_and_qa(ideas, failed_ideas)
+    
+    # 步骤1.6：改进思路
+    print("\n[步骤1.6] 成员改进思路...")
+    ideas = improve_ideas(ideas, qa_record, failed_ideas)
+    improved_log = "\n".join([f"成员 {i+1} 改进后思路：\n{ideas[i] if ideas[i] else '<空>'}" for i in range(MEMBER_COUNT)])
+    log_message("改进后的解题思路", improved_log)
+    for i, idea in enumerate(ideas):
+        if idea and idea.strip():
+            preview = idea[:100] + "..." if len(idea) > 100 else idea
+            print(f"  成员 {i+1} 改进后思路预览：{preview}")
+
     # 步骤2：投票选思路
     print("\n[步骤2] 成员投票选择最佳思路...")
     best_idea_idx = select_best_idea(ideas, failed_ideas)
@@ -621,6 +1146,31 @@ def solve_problem(question, test_cases=None):
         if code and code.strip():
             preview = code[:100].replace('\n', ' ') + "..." if len(code) > 100 else code
             print(f"  成员 {i+1} 代码预览：{preview}")
+        else:
+            print(f"  成员 {i+1} 代码：<空>")
+
+    # 步骤3.5：代码展示 + 交叉提问 + 回答
+    # 构建题目信息传递给步骤3.5
+    question_data = {
+        'input_format': formatted_question.get('input_format', '未提供'),
+        'output_format': formatted_question.get('output_format', '未提供'),
+        'constraints': formatted_question.get('constraints', '未提供'),
+        'max_input': formatted_question.get('max_input', '未提供'),
+        'question_content': formatted_question_str if formatted_question_str else question,
+        'question': question_to_use
+    }
+    print("\n[步骤3.5] 代码展示 + 交叉提问...")
+    qa_record_codes, questions_by_code = show_codes_and_qa(codes, question_data, failed_codes)
+    
+    # 步骤3.6：改进代码
+    print("\n[步骤3.6] 成员改进代码...")
+    codes = improve_codes(codes, qa_record_codes, question_data, failed_codes)
+    improved_codes_log = "\n".join([f"成员 {i+1} 改进后代码：\n{codes[i]}" for i in range(MEMBER_COUNT)])
+    log_message("改进后的代码", improved_codes_log)
+    for i, code in enumerate(codes):
+        if code and code.strip():
+            preview = code[:100].replace('\n', ' ') + "..." if len(code) > 100 else code
+            print(f"  成员 {i+1} 改进后代码预览：{preview}")
         else:
             print(f"  成员 {i+1} 代码：<空>")
 

@@ -1,4 +1,4 @@
-成员 1 代码:
+代码1（成员1）：
 ```cpp
 #include <iostream>
 #include <vector>
@@ -52,7 +52,7 @@ int main() {
 }
 ```
 
-成员 2 代码:
+代码2（成员2）：
 
 
 #include <bits/stdc++.h>
@@ -105,7 +105,7 @@ int main(){
     return 0;
 }
 
-成员 3 代码:
+代码3（成员3）：
 #include <iostream>
 #include <vector>
 #include <algorithm>

@@ -1,29 +1,71 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <cstddef>
 using namespace std;
 
-struct Carpet {int a,b,g,k;};
+typedef __int128 ll;
+
+void print(__int128 x) {
+    if (x == 0) {
+        cout << "0" << endl;
+        return;
+    }
+    if (x < 0) {
+        cout << '-';
+        x = -x;
+    }
+    string s;
+    while (x > 0) {
+        s += char('0' + x % 10);
+        x /= 10;
+    }
+    reverse(s.begin(), s.end());
+    cout << s << endl;
+}
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    int n;
-    if(!(cin>>n)) return 0;
-    vector<Carpet> carpets;
-    carpets.reserve(n);
-    for(int i=0;i<n;i++){
-        Carpet c;
-        cin>>c.a>>c.b>>c.g>>c.k;
-        carpets.push_back(c);
-    }
-    int x,y;
-    cin>>x>>y;
-    for(int i=n-1;i>=0;i--){
-        const Carpet &c = carpets[i];
-        if(x>=c.a && x<=c.a+c.g && y>=c.b && y<=c.b+c.k){
-            cout<<i+1<<"\n";
-            return 0;
+
+    int n, m;
+    cin >> n >> m;
+
+    vector<vector<int>> matrix(n, vector<int>(m));
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            cin >> matrix[i][j];
         }
     }
-    cout<<-1<<"\n";
+
+    vector<ll> pow2(m + 1);
+    pow2[0] = 1;
+    for (int i = 1; i <= m; i++) {
+        pow2[i] = pow2[i - 1] * 2;
+    }
+
+    ll totalScore = 0;
+
+    for (int i = 0; i < n; i++) {
+        vector<vector<ll>> dp(m, vector<ll>(m, 0));
+        for (int len = 1; len <= m; len++) {
+            for (int l = 0; l <= m - len; l++) {
+                int r = l + len - 1;
+                int round = m - len + 1;
+                if (len == 1) {
+                    dp[l][r] = (ll)matrix[i][l] * pow2[round];
+                } else {
+                    ll takeLeft = (ll)matrix[i][l] * pow2[round] + dp[l + 1][r];
+                    ll takeRight = (ll)matrix[i][r] * pow2[round] + dp[l][r - 1];
+                    dp[l][r] = max(takeLeft, takeRight);
+                }
+            }
+        }
+        totalScore += dp[0][m - 1];
+    }
+
+    print(totalScore);
+
     return 0;
 }

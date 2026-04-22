@@ -24,7 +24,10 @@ from main import (
     current_best_idea,
     MODELS,
     MEMBER_COUNT,
-    REVIEWER_MODEL
+    REVIEWER_MODEL,
+    # 新增
+    show_ideas_and_qa,
+    improve_ideas,
 )
 
 # 全局状态
@@ -42,6 +45,10 @@ class State:
         self.idea_votes = {}  # 记录思路投票
         self.code_votes = {}  # 记录代码投票
         self.review_details = {}  # 记录审查详情
+        # 新增：步骤1.5 和 1.6
+        self.qa_record = []  # 问答记录
+        self.improved_ideas = []  # 改进后的思路
+        self.failed_ideas = []  # 失败的思路
         
 state = State()
 
@@ -126,6 +133,50 @@ def ideas():
             'count': valid_count,
             'ideas': ideas_detail,
             'failed_members': [i+1 for i in failed]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# 新增：步骤1.5 - 思路展示+交叉提问+回答
+@app.route('/api/ideas_qa', methods=['POST'])
+def ideas_qa():
+    try:
+        # 执行思路展示+问答
+        qa_record = show_ideas_and_qa(state.ideas)
+        state.qa_record = qa_record
+        
+        return jsonify({
+            'success': True,
+            'count': len(qa_record),
+            'qa_record': qa_record
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# 新增：步骤1.6 - 改进思路
+@app.route('/api/improve_ideas', methods=['POST'])
+def improve_ideas_api():
+    try:
+        # 执行改进思路
+        improved = improve_ideas(state.ideas, state.qa_record)
+        state.improved_ideas = improved
+        
+        # 格式化每个成员的改进思路
+        improved_detail = []
+        for i, idea in enumerate(improved):
+            improved_detail.append({
+                'member': i + 1,
+                'model': MODELS[i+1],
+                'improved_idea': idea if idea else '',
+                'original_idea': state.ideas[i] if state.ideas[i] else ''
+            })
+        
+        return jsonify({
+            'success': True,
+            'count': len(improved),
+            'improved_ideas': improved_detail
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -324,6 +375,30 @@ def get_stage_detail(stage_num):
                 'title': '成员生成解题思路',
                 'ideas': ideas_detail
             })
+        elif stage_num == 15 or stage_num == 1.5:
+            # 步骤1.5: 问答阶段
+            return jsonify({
+                'success': True,
+                'stage': 1.5,
+                'title': '思路展示 + 交叉提问',
+                'qa_record': state.qa_record
+            })
+        elif stage_num == 16 or stage_num == 1.6:
+            # 步骤1.6: 改进思路阶段
+            improved_detail = []
+            for i, idea in enumerate(state.improved_ideas):
+                improved_detail.append({
+                    'member': i + 1,
+                    'model': MODELS[i+1] if i+1 < len(MODELS) else 'Unknown',
+                    'improved_idea': idea if idea else '',
+                    'original_idea': state.ideas[i] if state.ideas[i] else ''
+                })
+            return jsonify({
+                'success': True,
+                'stage': 1.6,
+                'title': '成员改进思路',
+                'improved_ideas': improved_detail
+            })
         elif stage_num == 2:
             # 思路投票阶段
             import os
@@ -357,6 +432,40 @@ def get_stage_detail(stage_num):
                 'stage': 3,
                 'title': '成员编写代码',
                 'codes': codes_detail
+            })
+        elif stage_num == 35 or stage_num == 3.5:
+            # 步骤3.5: 代码展示+交叉提问+回答
+            import os
+            details_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'details')
+            qa_record = ''
+            qa_file = os.path.join(details_dir, 'stage3_5_qa_record.txt')
+            if os.path.exists(qa_file):
+                with open(qa_file, 'r', encoding='utf-8') as f:
+                    qa_record = f.read()
+            
+            return jsonify({
+                'success': True,
+                'stage': 3.5,
+                'title': '代码展示+交叉提问+回答',
+                'qa_record': qa_record,
+                'all_codes': state.codes
+            })
+        elif stage_num == 36 or stage_num == 3.6:
+            # 步骤3.6: 改进代码
+            import os
+            details_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'details')
+            improved_codes_detail = ''
+            improved_file = os.path.join(details_dir, 'stage3_6_improved_codes.txt')
+            if os.path.exists(improved_file):
+                with open(improved_file, 'r', encoding='utf-8') as f:
+                    improved_codes_detail = f.read()
+            
+            return jsonify({
+                'success': True,
+                'stage': 3.6,
+                'title': '成员改进代码',
+                'improved_codes': improved_codes_detail,
+                'all_codes': state.codes
             })
         elif stage_num == 4:
             # 代码投票阶段

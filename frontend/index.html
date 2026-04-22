@@ -588,6 +588,42 @@
                 </div>
             </div>
             
+            <!-- Stage 1.5: 思路展示 + 交叉提问 -->
+            <div class="stage-card" id="stage1_5">
+                <div class="stage-header" onclick="toggleStage(1.5)">
+                    <span class="stage-number">1.5</span>
+                    <div class="stage-info">
+                        <div class="stage-title">思路展示 + 交叉提问</div>
+                        <div class="stage-subtitle" id="stage1_5-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
+                </div>
+                <div class="stage-content" id="stage1_5-content">
+                    <div class="qa-section">
+                        <h4>💬 问答记录</h4>
+                        <div id="qa-container"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stage 1.6: 改进思路 -->
+            <div class="stage-card" id="stage1_6">
+                <div class="stage-header" onclick="toggleStage(1.6)">
+                    <span class="stage-number">1.6</span>
+                    <div class="stage-info">
+                        <div class="stage-title">成员改进思路</div>
+                        <div class="stage-subtitle" id="stage1_6-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
+                </div>
+                <div class="stage-content" id="stage1_6-content">
+                    <div class="improved-section">
+                        <h4>🔄 改进后的思路</h4>
+                        <div id="improved-ideas-container"></div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Stage 2 -->
             <div class="stage-card" id="stage2">
                 <div class="stage-header" onclick="toggleStage(2)">
@@ -627,6 +663,36 @@
                 </div>
                 <div class="stage-content" id="stage3-content">
                     <div id="codes-container"></div>
+                </div>
+            </div>
+            
+            <!-- Stage 3.5 -->
+            <div class="stage-card" id="stage3_5">
+                <div class="stage-header" onclick="toggleStage(3.5)">
+                    <span class="stage-number">3.5</span>
+                    <div class="stage-info">
+                        <div class="stage-title">代码展示+交叉提问</div>
+                        <div class="stage-subtitle" id="stage3_5-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
+                </div>
+                <div class="stage-content" id="stage3_5-content">
+                    <div id="code-qa-container"></div>
+                </div>
+            </div>
+            
+            <!-- Stage 3.6 -->
+            <div class="stage-card" id="stage3_6">
+                <div class="stage-header" onclick="toggleStage(3.6)">
+                    <span class="stage-number">3.6</span>
+                    <div class="stage-info">
+                        <div class="stage-title">成员改进代码</div>
+                        <div class="stage-subtitle" id="stage3_6-subtitle">等待上一步完成...</div>
+                    </div>
+                    <span class="stage-toggle">▼</span>
+                </div>
+                <div class="stage-content" id="stage3_6-content">
+                    <div id="improved-codes-container"></div>
                 </div>
             </div>
             
@@ -712,13 +778,17 @@
         let isRunning = false;
         
         function toggleStage(num) {
-            const stage = document.getElementById('stage' + num);
+            // 将数字转换为字符串，处理小数点
+            const stageId = 'stage' + String(num).replace('.', '_');
+            const stage = document.getElementById(stageId);
             stage.classList.toggle('expanded');
         }
         
         function updateStage(stageNum, status, subtitle = '') {
-            const stage = document.getElementById('stage' + stageNum);
-            const subtitleEl = document.getElementById('stage' + stageNum + '-subtitle');
+            // 将数字转换为字符串，处理小数点
+            const stageId = 'stage' + String(stageNum).replace('.', '_');
+            const stage = document.getElementById(stageId);
+            const subtitleEl = document.getElementById(stageId + '-subtitle');
             
             stage.classList.remove('active', 'completed', 'error');
             
@@ -797,6 +867,34 @@
                 }
                 voteBarsEl.innerHTML = barsHtml;
             }
+        }
+        
+        function renderCodeQA(data) {
+            const container = document.getElementById('code-qa-container');
+            if (!data.qa_record) {
+                container.innerHTML = '<p style="padding: 10px;">暂无问答记录</p>';
+                return;
+            }
+            
+            let html = '<div class="detail-section"><h3>💬 代码问答记录</h3>';
+            html += '<pre style="white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 5px; max-height: 400px; overflow-y: auto;">';
+            html += escapeHtml(data.qa_record);
+            html += '</pre></div>';
+            container.innerHTML = html;
+        }
+        
+        function renderImprovedCodes(data) {
+            const container = document.getElementById('improved-codes-container');
+            if (!data.improved_codes) {
+                container.innerHTML = '<p style="padding: 10px;">暂无改进后的代码</p>';
+                return;
+            }
+            
+            let html = '<div class="detail-section"><h3>🔧 改进后的代码</h3>';
+            html += '<pre style="white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 5px; max-height: 400px; overflow-y: auto;">';
+            html += escapeHtml(data.improved_codes);
+            html += '</pre></div>';
+            container.innerHTML = html;
         }
         
         function escapeHtml(text) {
@@ -885,6 +983,54 @@
             `).join('');
         }
         
+        // 渲染问答记录
+        function renderQARecord(data) {
+            const container = document.getElementById('qa-container');
+            if (!data.qa_record || data.qa_record.length === 0) {
+                container.innerHTML = '<div class="member-content">无问答记录</div>';
+                return;
+            }
+            container.innerHTML = data.qa_record.map((rec, idx) => `
+                <div class="member-item">
+                    <div class="member-header">
+                        <span class="member-name">成员 ${rec.member}</span>
+                    </div>
+                    <div class="qa-section">
+                        <div class="qa-questions"><strong>收到的问题：</strong>
+                            <div>${rec.questions && rec.questions.length > 0 ? rec.questions.map(q => `<div class="qa-question-item">${escapeHtml(q)}</div>`).join('') : '无'}</div>
+                        </div>
+                        <div class="qa-answers"><strong>回答：</strong>
+                            <div class="qa-answer-content">${escapeHtml(rec.answers || '无')}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 渲染改进后的思路
+        function renderImprovedIdeas(data) {
+            const container = document.getElementById('improved-ideas-container');
+            if (!data.improved_ideas || data.improved_ideas.length === 0) {
+                container.innerHTML = '<div class="member-content">无改进记录</div>';
+                return;
+            }
+            container.innerHTML = data.improved_ideas.map((idea, idx) => `
+                <div class="member-item">
+                    <div class="member-header">
+                        <span class="member-name">成员 ${idea.member}</span>
+                        <span class="member-model">${idea.model}</span>
+                    </div>
+                    <div class="member-original"><strong>原始思路：</strong>
+                        <div class="member-content">${escapeHtml(idea.original_idea || '<无>')}</div>
+                    </div>
+                    <div class="member-improved"><strong>改进后：</strong>
+                        <div class="member-content">${escapeHtml(idea.improved_idea || '<无>')}</div>
+                    </div>
+                    <button class="copy-btn" onclick="copyText(this, '${escapeHtml(idea.improved_idea || '').replace(/'/g, "\\'")}')">📋 复制</button>
+                </div>
+            `).join('');
+        }
+        
         
         
         async function runSystem() {
@@ -961,6 +1107,44 @@
                 } else {
                     updateStage(1, 'error', '❌ ' + stage1Data.error);
                 }
+                updateProgress(35);
+                
+                // Stage 1.5: 思路展示 + 交叉提问
+                updateStage(1.5, 'running', '正在进行问答...');
+                updateStatus('步骤1.5: 思路展示 + 交叉提问', true);
+                
+                const stage1_5Res = await fetch('/api/ideas_qa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const stage1_5Data = await stage1_5Res.json();
+                
+                if (stage1_5Data.success) {
+                    updateStage(1.5, 'completed', `✅ 问答完成`);
+                    renderQARecord(stage1_5Data);
+                } else {
+                    updateStage(1.5, 'error', '❌ ' + stage1_5Data.error);
+                }
+                updateProgress(40);
+                
+                // Stage 1.6: 改进思路
+                updateStage(1.6, 'running', '正在改进思路...');
+                updateStatus('步骤1.6: 成员改进思路', true);
+                
+                const stage1_6Res = await fetch('/api/improve_ideas', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const stage1_6Data = await stage1_6Res.json();
+                
+                if (stage1_6Data.success) {
+                    updateStage(1.6, 'completed', `✅ 改进完成`);
+                    renderImprovedIdeas(stage1_6Data);
+                } else {
+                    updateStage(1.6, 'error', '❌ ' + stage1_6Data.error);
+                }
                 updateProgress(45);
                 
                 // Stage 2: Select best idea
@@ -1003,7 +1187,43 @@
                 } else {
                     updateStage(3, 'error', '❌ ' + stage3Data.error);
                 }
-                updateProgress(85);
+                updateProgress(80);
+                
+                // Stage 3.5: Code Q&A
+                updateStage(3.5, 'running', '正在交叉提问...');
+                updateStatus('步骤3.5: 代码展示+交叉提问', true);
+                updateProgress(82);
+                
+                const stage35Res = await fetch('/api/stage/3.5', {
+                    method: 'GET'
+                });
+                const stage35Data = await stage35Res.json();
+                
+                if (stage35Data.success) {
+                    updateStage(3.5, 'completed', '✅ 问答完成');
+                    renderCodeQA(stage35Data);
+                } else {
+                    updateStage(3.5, 'error', '❌ ' + stage35Data.error);
+                }
+                updateProgress(84);
+                
+                // Stage 3.6: Improve code
+                updateStage(3.6, 'running', '正在改进代码...');
+                updateStatus('步骤3.6: 成员改进代码', true);
+                updateProgress(86);
+                
+                const stage36Res = await fetch('/api/stage/3.6', {
+                    method: 'GET'
+                });
+                const stage36Data = await stage36Res.json();
+                
+                if (stage36Data.success) {
+                    updateStage(3.6, 'completed', '✅ 改进完成');
+                    renderImprovedCodes(stage36Data);
+                } else {
+                    updateStage(3.6, 'error', '❌ ' + stage36Data.error);
+                }
+                updateProgress(88);
                 
                 // Stage 4: Select best code
                 updateStage(4, 'running', '正在投票...');

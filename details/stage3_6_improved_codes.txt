@@ -5,13 +5,24 @@
 #include <algorithm>
 using namespace std;
 
-typedef long long ll;
+typedef __int128 ll;
 
 const int MAXN = 80;
 const int MAXM = 80;
 
 ll dp[MAXM][MAXM];
 ll pow2[MAXM + 1];
+
+string int128_to_string(ll x) {
+    if (x == 0) return "0";
+    string s;
+    while (x > 0) {
+        s.push_back('0' + x % 10);
+        x /= 10;
+    }
+    reverse(s.begin(), s.end());
+    return s;
+}
 
 ll solve_row(const vector<int>& row, int m) {
     for (int i = 0; i < m; ++i) {
@@ -47,76 +58,50 @@ int main() {
         total_score += solve_row(matrix[i], m);
     }
 
-    cout << total_score << endl;
+    cout << int128_to_string(total_score) << endl;
     return 0;
 }
 ```
 
 成员 2 代码:
-
-
-#include <bits/stdc++.h>
-using namespace std;
-
-string int128_to_string(__int128 x){
-    if(x==0) return "0";
-    bool neg = false;
-    if(x<0){
-        neg = true;
-        x = -x;
-    }
-    string s;
-    while(x>0){
-        int digit = x%10;
-        s.push_back('0'+digit);
-        x/=10;
-    }
-    if(neg) s.push_back('-');
-    reverse(s.begin(), s.end());
-    return s;
-}
-
-int main(){
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    int n,m;
-    if(!(cin>>n>>m)) return 0;
-    vector<__int128> pow2(m+1);
-    pow2[0] = 1;
-    for(int i=1;i<=m;i++) pow2[i] = pow2[i-1] * 2;
-    __int128 total = 0;
-    for(int row=0; row<n; ++row){
-        vector<int> a(m);
-        for(int j=0;j<m;++j) cin>>a[j];
-        vector<vector<__int128>> dp(m, vector<__int128>(m, 0));
-        for(int i=0;i<m;++i) dp[i][i] = (__int128)a[i] * pow2[m];
-        for(int len=2; len<=m; ++len){
-            int exp = m - len + 1;
-            for(int l=0; l+len-1 < m; ++l){
-                int r = l + len - 1;
-                __int128 left = (__int128)a[l] * pow2[exp] + dp[l+1][r];
-                __int128 right = (__int128)a[r] * pow2[exp] + dp[l][r-1];
-                dp[l][r] = left > right ? left : right;
-            }
-        }
-        total += dp[0][m-1];
-    }
-    cout << int128_to_string(total);
-    return 0;
-}
+无
+原因简述：原代码已使用 `__int128` 防止溢出，DP 递推正确，且每行使用局部 `dp` 数组避免跨行干扰。算法时间复杂度为 O(n·m²)，在题目约束（n、m ≤ 80）下运行毫无压力。因此代码已经满足正确性、性能和边界处理的要求，无需进一步修改。
 
 成员 3 代码:
+```cpp
 #include <iostream>
 #include <vector>
 #include <algorithm>
 using namespace std;
 
-typedef long long ll;
+typedef __int128 ll;
+
+void print(__int128 x) {
+    if (x == 0) {
+        cout << "0" << endl;
+        return;
+    }
+    if (x < 0) {
+        cout << '-';
+        x = -x;
+    }
+    string s;
+    while (x > 0) {
+        s += char('0' + x % 10);
+        x /= 10;
+    }
+    reverse(s.begin(), s.end());
+    cout << s << endl;
+}
 
 int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
     int n, m;
     cin >> n >> m;
-    vector<vector<ll>> matrix(n, vector<ll>(m));
+
+    vector<vector<int>> matrix(n, vector<int>(m));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < m; j++) {
             cin >> matrix[i][j];
@@ -136,13 +121,12 @@ int main() {
         for (int len = 1; len <= m; len++) {
             for (int l = 0; l <= m - len; l++) {
                 int r = l + len - 1;
-                int taken = m - len;
-                int round = taken + 1;
+                int round = m - len + 1; // round from 1 to m
                 if (len == 1) {
-                    dp[l][r] = matrix[i][l] * pow2[round];
+                    dp[l][r] = (__int128)matrix[i][l] * pow2[round];
                 } else {
-                    ll takeLeft = matrix[i][l] * pow2[round] + dp[l + 1][r];
-                    ll takeRight = matrix[i][r] * pow2[round] + dp[l][r - 1];
+                    ll takeLeft = (__int128)matrix[i][l] * pow2[round] + dp[l + 1][r];
+                    ll takeRight = (__int128)matrix[i][r] * pow2[round] + dp[l][r - 1];
                     dp[l][r] = max(takeLeft, takeRight);
                 }
             }
@@ -150,7 +134,8 @@ int main() {
         totalScore += dp[0][m - 1];
     }
 
-    cout << totalScore << endl;
+    print(totalScore);
 
     return 0;
 }
+```

@@ -1,38 +1,71 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <cstddef>
 using namespace std;
+
+typedef __int128 ll;
+
+void print(__int128 x) {
+    if (x == 0) {
+        cout << "0" << endl;
+        return;
+    }
+    if (x < 0) {
+        cout << '-';
+        x = -x;
+    }
+    string s;
+    while (x > 0) {
+        s += char('0' + x % 10);
+        x /= 10;
+    }
+    reverse(s.begin(), s.end());
+    cout << s << endl;
+}
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    vector<int> a;
-    int x;
-    while (cin >> x) {
-        a.push_back(x);
-    }
-    if (a.empty()) {
-        cout << 0 << "\n" << 0 << "\n";
-        return 0;
+
+    int n, m;
+    cin >> n >> m;
+
+    vector<vector<int>> matrix(n, vector<int>(m));
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            cin >> matrix[i][j];
+        }
     }
 
-    vector<int> tail1;
-    tail1.reserve(a.size());
-    for (int v : a) {
-        int y = -v;
-        auto it = upper_bound(tail1.begin(), tail1.end(), y);
-        if (it == tail1.end()) tail1.push_back(y);
-        else *it = y;
+    vector<ll> pow2(m + 1);
+    pow2[0] = 1;
+    for (int i = 1; i <= m; i++) {
+        pow2[i] = pow2[i - 1] * 2;
     }
-    int lnnis_len = (int)tail1.size();
 
-    vector<int> tail2;
-    tail2.reserve(a.size());
-    for (int v : a) {
-        auto it = lower_bound(tail2.begin(), tail2.end(), v);
-        if (it == tail2.end()) tail2.push_back(v);
-        else *it = v;
+    ll totalScore = 0;
+
+    for (int i = 0; i < n; i++) {
+        vector<vector<ll>> dp(m, vector<ll>(m, 0));
+        for (int len = 1; len <= m; len++) {
+            for (int l = 0; l <= m - len; l++) {
+                int r = l + len - 1;
+                int round = m - len + 1;
+                if (len == 1) {
+                    dp[l][r] = (ll)matrix[i][l] * pow2[round];
+                } else {
+                    ll takeLeft = (ll)matrix[i][l] * pow2[round] + dp[l + 1][r];
+                    ll takeRight = (ll)matrix[i][r] * pow2[round] + dp[l][r - 1];
+                    dp[l][r] = max(takeLeft, takeRight);
+                }
+            }
+        }
+        totalScore += dp[0][m - 1];
     }
-    int lis_len = (int)tail2.size();
 
-    cout << lnnis_len << "\n" << lis_len << "\n";
+    print(totalScore);
+
     return 0;
 }
