@@ -1,71 +1,88 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <string>
-#include <cstddef>
 using namespace std;
 
-typedef __int128 ll;
+using ll = long long;
 
-void print(__int128 x) {
-    if (x == 0) {
-        cout << "0" << endl;
-        return;
-    }
-    if (x < 0) {
-        cout << '-';
-        x = -x;
-    }
-    string s;
-    while (x > 0) {
-        s += char('0' + x % 10);
-        x /= 10;
-    }
-    reverse(s.begin(), s.end());
-    cout << s << endl;
+ll sum_dist(const vector<int>& arr, const vector<ll>& pre, ll x) {
+    int n = arr.size();
+    int pos = lower_bound(arr.begin(), arr.end(), (int)x) - arr.begin();
+    ll total = pre[n];
+    return x * pos - pre[pos] + (pre[n] - pre[pos]) - x * (n - pos);
 }
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-
-    int n, m;
-    cin >> n >> m;
-
-    vector<vector<int>> matrix(n, vector<int>(m));
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            cin >> matrix[i][j];
-        }
+    
+    int N;
+    ll D;
+    cin >> N >> D;
+    
+    vector<int> xs(N), ys(N);
+    for (int i = 0; i < N; ++i) {
+        cin >> xs[i] >> ys[i];
     }
-
-    vector<ll> pow2(m + 1);
-    pow2[0] = 1;
-    for (int i = 1; i <= m; i++) {
-        pow2[i] = pow2[i - 1] * 2;
+    
+    sort(xs.begin(), xs.end());
+    sort(ys.begin(), ys.end());
+    
+    vector<ll> preX(N + 1, 0), preY(N + 1, 0);
+    for (int i = 0; i < N; ++i) {
+        preX[i + 1] = preX[i] + xs[i];
+        preY[i + 1] = preY[i] + ys[i];
     }
-
-    ll totalScore = 0;
-
-    for (int i = 0; i < n; i++) {
-        vector<vector<ll>> dp(m, vector<ll>(m, 0));
-        for (int len = 1; len <= m; len++) {
-            for (int l = 0; l <= m - len; l++) {
-                int r = l + len - 1;
-                int round = m - len + 1;
-                if (len == 1) {
-                    dp[l][r] = (ll)matrix[i][l] * pow2[round];
-                } else {
-                    ll takeLeft = (ll)matrix[i][l] * pow2[round] + dp[l + 1][r];
-                    ll takeRight = (ll)matrix[i][r] * pow2[round] + dp[l][r - 1];
-                    dp[l][r] = max(takeLeft, takeRight);
-                }
+    
+    ll min_x = xs[0], max_x = xs.back();
+    ll min_y = ys[0], max_y = ys.back();
+    
+    ll x_low = min_x - D;
+    ll x_high = max_x + D;
+    ll y_low = min_y - D;
+    ll y_high = max_y + D;
+    
+    ll ans = 0;
+    
+    for (ll x = x_low; x <= x_high; ++x) {
+        ll sum_x = sum_dist(xs, preX, x);
+        if (sum_x > D) continue;
+        
+        ll remaining = D - sum_x;
+        
+        ll left = y_low, right = y_high;
+        ll y_min = y_high + 1;
+        ll y_max = y_low - 1;
+        
+        ll low = y_low, high = y_high;
+        while (low <= high) {
+            ll mid = (low + high) / 2;
+            ll sum_y = sum_dist(ys, preY, mid);
+            if (sum_y <= remaining) {
+                y_min = mid;
+                high = mid - 1;
+            } else {
+                low = mid + 1;
             }
         }
-        totalScore += dp[0][m - 1];
+        
+        low = y_low, high = y_high;
+        while (low <= high) {
+            ll mid = (low + high) / 2;
+            ll sum_y = sum_dist(ys, preY, mid);
+            if (sum_y <= remaining) {
+                y_max = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        
+        if (y_min <= y_max) {
+            ans += y_max - y_min + 1;
+        }
     }
-
-    print(totalScore);
-
+    
+    cout << ans << "\n";
     return 0;
 }

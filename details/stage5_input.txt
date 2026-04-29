@@ -1,2 +1,2 @@
-best_code_idx: 3
-test_cases: [{'input': '2 3\\n1 2 3\\n3 4 2', 'output': '82'}]
+best_code_idx: 2
+test_cases: [{'input': '2 3\n0 0\n1 0\n', 'output': '8\n'}, {'input': '2 0\n0 0\n2 0\n', 'output': '0\n'}, {'input': '6 100\n9 -6\n10 -1\n2 10\n-1 7\n-7 5\n-1 -4\n', 'output': '419\n'}]

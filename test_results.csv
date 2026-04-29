@@ -1,2 +1,21 @@
 problem_id,title,passed,test_count,compilation_error,runtime_error,code_length
-abc366_b,Vertical Writing,True,18,,,719
+abc365_b,Second Best,True,13,,,710
+abc365_a,Leap Year,True,10,,,175
+abc365_e,Xor Sigma Problem,False,20,,,966
+abc365_d,AtCoder Janken 3,True,20,,,1678
+abc365_c,Transportation Expenses,True,20,,,1066
+abc366_f,Maximum Composition,False,25,,,755
+abc366_b,Vertical Writing,True,18,,,666
+abc366_e,Manhattan Multifocal Ellipse,False,18,,,3106
+abc366_d,Cuboid Sum Query,True,18,,,1144
+abc366_a,Election 2,True,18,,,394
+abc366_c,Balls and Bag Query,True,18,,,627
+abc366_g,XOR Neighbors,False,25,,,5837
+abc367_e,Permute K times,True,25,,,1250
+abc367_f,Rearrange Query,True,25,,,1596
+abc367_a,Shout Everyday,True,11,,,458
+abc367_g,Sum of (XOR^K or 0),False,18,,,1355
+abc367_b,Cut .0,True,18,,,557
+abc367_d,Pedometer,False,25,,,1007
+abc367_c,Enumerate Sequences,True,18,,,671
+abc368_g,Add and Multiply Queries,False,25,,,1157

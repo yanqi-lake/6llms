@@ -1,141 +1,172 @@
 成员 1 代码:
-```cpp
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cmath>
+
 using namespace std;
 
-typedef __int128 ll;
-
-const int MAXN = 80;
-const int MAXM = 80;
-
-ll dp[MAXM][MAXM];
-ll pow2[MAXM + 1];
-
-string int128_to_string(ll x) {
-    if (x == 0) return "0";
-    string s;
-    while (x > 0) {
-        s.push_back('0' + x % 10);
-        x /= 10;
+vector<long long> compute_prefix_sums(vector<int>& coords) {
+    sort(coords.begin(), coords.end());
+    vector<long long> prefix(coords.size() + 1, 0);
+    for (int i = 0; i < coords.size(); ++i) {
+        prefix[i+1] = prefix[i] + coords[i];
     }
-    reverse(s.begin(), s.end());
-    return s;
+    return prefix;
 }
 
-ll solve_row(const vector<int>& row, int m) {
-    for (int i = 0; i < m; ++i) {
-        dp[i][i] = row[i] * pow2[m];
-    }
-    for (int len = 2; len <= m; ++len) {
-        for (int l = 0; l <= m - len; ++l) {
-            int r = l + len - 1;
-            int t = m - len + 1;
-            dp[l][r] = max(row[l] * pow2[t] + dp[l + 1][r], row[r] * pow2[t] + dp[l][r - 1]);
+long long compute_sum(const vector<int>& coords, const vector<long long>& prefix, int x) {
+    int k = lower_bound(coords.begin(), coords.end(), x) - coords.begin();
+    long long sum = (long long)x * k - prefix[k];
+    sum += (prefix.back() - prefix[k]) - (long long)x * (coords.size() - k);
+    return sum;
+}
+
+vector<pair<int, int>> get_ranges(const vector<int>& coords, const vector<long long>& prefix, long long max_sum) {
+    int n = coords.size();
+    int left = coords[0] - (int)(max_sum / n + 1);
+    int right = coords.back() + (int)(max_sum / n + 1);
+
+    int min_x = right;
+    int max_x = left;
+    for (int x = left; x <= right; ++x) {
+        long long s = compute_sum(coords, prefix, x);
+        if (s <= max_sum) {
+            min_x = min(min_x, x);
+            max_x = max(max_x, x);
         }
     }
-    return dp[0][m - 1];
+
+    if (min_x > max_x) return {};
+    return {{min_x, max_x}};
 }
 
 int main() {
-    int n, m;
-    cin >> n >> m;
-    vector<vector<int>> matrix(n, vector<int>(m));
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < m; ++j) {
-            cin >> matrix[i][j];
+    ios_base::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int N, D;
+    cin >> N >> D;
+    vector<int> x_coords(N), y_coords(N);
+    for (int i = 0; i < N; ++i) {
+        cin >> x_coords[i] >> y_coords[i];
+    }
+
+    auto x_prefix = compute_prefix_sums(x_coords);
+    auto y_prefix = compute_prefix_sums(y_coords);
+
+    auto x_ranges = get_ranges(x_coords, x_prefix, D);
+    if (x_ranges.empty()) {
+        cout << "0\n";
+        return 0;
+    }
+
+    long long result = 0;
+    for (auto [x_min, x_max] : x_ranges) {
+        for (int x = x_min; x <= x_max; ++x) {
+            long long sx = compute_sum(x_coords, x_prefix, x);
+            long long remaining = D - sx;
+            if (remaining < 0) continue;
+
+            auto y_ranges = get_ranges(y_coords, y_prefix, remaining);
+            for (auto [y_min, y_max] : y_ranges) {
+                result += y_max - y_min + 1;
+            }
         }
     }
 
-    pow2[0] = 1;
-    for (int i = 1; i <= m; ++i) {
-        pow2[i] = pow2[i - 1] * 2;
-    }
-
-    ll total_score = 0;
-    for (int i = 0; i < n; ++i) {
-        total_score += solve_row(matrix[i], m);
-    }
-
-    cout << int128_to_string(total_score) << endl;
+    cout << result << '\n';
     return 0;
 }
-```
 
 成员 2 代码:
-无
-原因简述：原代码已使用 `__int128` 防止溢出，DP 递推正确，且每行使用局部 `dp` 数组避免跨行干扰。算法时间复杂度为 O(n·m²)，在题目约束（n、m ≤ 80）下运行毫无压力。因此代码已经满足正确性、性能和边界处理的要求，无需进一步修改。
 
-成员 3 代码:
-```cpp
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
 using namespace std;
 
-typedef __int128 ll;
+using ll = long long;
 
-void print(__int128 x) {
-    if (x == 0) {
-        cout << "0" << endl;
-        return;
-    }
-    if (x < 0) {
-        cout << '-';
-        x = -x;
-    }
-    string s;
-    while (x > 0) {
-        s += char('0' + x % 10);
-        x /= 10;
-    }
-    reverse(s.begin(), s.end());
-    cout << s << endl;
+ll S(const vector<int>& arr, const vector<ll>& pre, long long x) {
+    int n = arr.size();
+    int pos = lower_bound(arr.begin(), arr.end(), (int)x) - arr.begin();
+    ll total = pre[n];
+    return x * n - 2 * pre[pos] + total;
 }
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-
-    int n, m;
-    cin >> n >> m;
-
-    vector<vector<int>> matrix(n, vector<int>(m));
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            cin >> matrix[i][j];
-        }
+    
+    int N;
+    long long D;
+    cin >> N >> D;
+    
+    vector<int> xs(N), ys(N);
+    for (int i = 0; i < N; ++i) {
+        cin >> xs[i] >> ys[i];
     }
-
-    vector<ll> pow2(m + 1);
-    pow2[0] = 1;
-    for (int i = 1; i <= m; i++) {
-        pow2[i] = pow2[i - 1] * 2;
+    
+    sort(xs.begin(), xs.end());
+    sort(ys.begin(), ys.end());
+    
+    vector<ll> preX(N + 1, 0), preY(N + 1, 0);
+    for (int i = 0; i < N; ++i) {
+        preX[i + 1] = preX[i] + xs[i];
+        preY[i + 1] = preY[i] + ys[i];
     }
-
-    ll totalScore = 0;
-
-    for (int i = 0; i < n; i++) {
-        vector<vector<ll>> dp(m, vector<ll>(m, 0));
-        for (int len = 1; len <= m; len++) {
-            for (int l = 0; l <= m - len; l++) {
-                int r = l + len - 1;
-                int round = m - len + 1; // round from 1 to m
-                if (len == 1) {
-                    dp[l][r] = (__int128)matrix[i][l] * pow2[round];
-                } else {
-                    ll takeLeft = (__int128)matrix[i][l] * pow2[round] + dp[l + 1][r];
-                    ll takeRight = (__int128)matrix[i][r] * pow2[round] + dp[l][r - 1];
-                    dp[l][r] = max(takeLeft, takeRight);
-                }
+    
+    int xMid = xs[N / 2];
+    int yMid = ys[N / 2];
+    
+    ll minSx = S(xs, preX, xMid);
+    ll minSy = S(ys, preY, yMid);
+    
+    if (minSx + minSy > D) {
+        cout << 0 << "\n";
+        return 0;
+    }
+    
+    long long xLow = (long long)xMid - (D - minSx);
+    long long xHigh = (long long)xMid + (D - minSx);
+    long long yLow = (long long)yMid - (D - minSy);
+    long long yHigh = (long long)yMid + (D - minSy);
+    
+    long long yLeft = yMid;
+    long long yRight = yMid;
+    long long ans = 0;
+    
+    for (long long x = xLow; x <= xHigh; ++x) {
+        ll sX = S(xs, preX, x);
+        ll remaining = D - sX;
+        
+        if (remaining < minSy) continue;
+        
+        while (yLeft > yLow) {
+            ll sLeft = S(ys, preY, yLeft - 1);
+            if (sLeft <= remaining) {
+                --yLeft;
+            } else {
+                break;
             }
         }
-        totalScore += dp[0][m - 1];
+        
+        while (yRight < yHigh) {
+            ll sRight = S(ys, preY, yRight + 1);
+            if (sRight <= remaining) {
+                ++yRight;
+            } else {
+                break;
+            }
+        }
+        
+        ans += (yRight - yLeft + 1);
     }
-
-    print(totalScore);
-
+    
+    cout << ans << "\n";
     return 0;
 }
-```
+
+成员 3: <空>

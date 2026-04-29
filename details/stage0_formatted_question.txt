@@ -1,19 +1,19 @@
-题目标题: P1005 [NOIP 2007 提高组] 矩阵取数游戏
+题目标题: Second Best
 
 题目描述:
-帅帅经常跟同学玩一个矩阵取数游戏：对于一个给定的 $n \\times m$ 的矩阵，矩阵中的每个元素 $a_{i,j}$ 均为非负整数。游戏规则如下：\n\n1. 每次取数时须从每行各取走一个元素，共 $n$ 个。经过 $m$ 次后取完矩阵内所有元素；\n2. 每次取走的各个元素只能是该元素所在行的行首或行尾；\n3. 每次取数都有一个得分值，为每行取数的得分之和，每行取数的得分 = 被取走的元素值 $\\times 2^i$，其中 $i$ 表示第 $i$ 次取数（从 $1$ 开始编号）；\n4. 游戏结束总得分为 $m$ 次取数得分之和。\n\n帅帅想请你帮忙写一个程序，对于任意矩阵，可以求出取数后的最大得分。
+You are given an integer sequence A=(A_1,...,A_N) of length N. Here, A_1, A_2, ..., A_N are all distinct.\nWhich element in A is the second largest?\n\nSample Input 1:\n4\n8 2 5 1\nSample Output 1:\n3\nThe second largest element in A is A_3, so print 3.\n\nSample Input 2:\n8\n1 2 3 4 5 10 9 11\nSample Output 2:\n6
 
 输入格式:
-输入文件包括 $n+1$ 行：\n\n第一行为两个用空格隔开的整数 $n$ 和 $m$。\n\n第 $2\\sim n+1$ 行为 $n \\times m$ 矩阵，其中每行有 $m$ 个用单个空格隔开的非负整数。
+The input is given from Standard Input in the following format:\nN\nA_1 A_2 ... A_N
 
 输出格式:
-输出文件仅包含 $1$ 行，为一个整数，即输入矩阵取数后的最大得分。
+Print the integer X such that the X-th element in A is the second largest.
 
 样例输入:
-2 3\n1 2 3\n3 4 2
+4\n8 2 5 1
 
 样例输出:
-82
+3
 
 约束条件:
-对于 $60\\%$ 的数据，满足 $1\\le n,m\\le 30$，答案不超过 $10^{16}$。  \n对于 $100\\%$ 的数据，满足 $1\\le n,m\\le 80$，$0\\le a_{i,j}\\le1000$。
+2 ≤ N ≤ 100\n1 ≤ A_i ≤ 10^9\nA_1, A_2, ..., A_N are all distinct.\nAll input values are integers.

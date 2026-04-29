@@ -1,71 +1,174 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
 #include <string>
-#include <cstddef>
+#include <algorithm>
+#include <cstring>
+
 using namespace std;
 
-typedef __int128 ll;
+const int BASE = 1000000000;
+const int BASE_DIGITS = 9;
 
-void print(__int128 x) {
-    if (x == 0) {
-        cout << "0" << endl;
-        return;
+struct BigInt {
+    vector<int> digits;
+    
+    BigInt() {}
+    
+    BigInt(long long v) {
+        while (v > 0) {
+            digits.push_back(v % BASE);
+            v /= BASE;
+        }
+        if (digits.empty()) {
+            digits.push_back(0);
+        }
     }
-    if (x < 0) {
-        cout << '-';
-        x = -x;
+    
+    void normalize() {
+        while (digits.size() > 1 && digits.back() == 0) {
+            digits.pop_back();
+        }
     }
-    string s;
-    while (x > 0) {
-        s += char('0' + x % 10);
-        x /= 10;
+    
+    BigInt operator+(const BigInt& other) const {
+        BigInt result;
+        int carry = 0;
+        int n = max(digits.size(), other.digits.size());
+        result.digits.resize(n);
+        for (int i = 0; i < n; i++) {
+            long long sum = carry;
+            if (i < (int)digits.size()) sum += digits[i];
+            if (i < (int)other.digits.size()) sum += other.digits[i];
+            result.digits[i] = sum % BASE;
+            carry = sum / BASE;
+        }
+        if (carry > 0) {
+            result.digits.push_back(carry);
+        }
+        return result;
     }
-    reverse(s.begin(), s.end());
-    cout << s << endl;
-}
+    
+    BigInt& operator+=(const BigInt& other) {
+        *this = *this + other;
+        return *this;
+    }
+    
+    BigInt operator*(int v) const {
+        BigInt result;
+        long long carry = 0;
+        result.digits.resize(digits.size());
+        for (size_t i = 0; i < digits.size(); i++) {
+            long long prod = (long long)digits[i] * v + carry;
+            result.digits[i] = prod % BASE;
+            carry = prod / BASE;
+        }
+        while (carry > 0) {
+            result.digits.push_back(carry % BASE);
+            carry /= BASE;
+        }
+        result.normalize();
+        return result;
+    }
+    
+    BigInt operator*(const BigInt& other) const {
+        BigInt result;
+        result.digits.resize(digits.size() + other.digits.size());
+        for (size_t i = 0; i < digits.size(); i++) {
+            long long carry = 0;
+            for (size_t j = 0; j < other.digits.size() || carry > 0; j++) {
+                long long prod = result.digits[i+j] + carry + 
+                               (long long)digits[i] * (j < other.digits.size() ? other.digits[j] : 0);
+                result.digits[i+j] = prod % BASE;
+                carry = prod / BASE;
+            }
+        }
+        result.normalize();
+        return result;
+    }
+    
+    bool operator<(const BigInt& other) const {
+        if (digits.size() != other.digits.size()) {
+            return digits.size() < other.digits.size();
+        }
+        for (int i = (int)digits.size() - 1; i >= 0; i--) {
+            if (digits[i] != other.digits[i]) {
+                return digits[i] < other.digits[i];
+            }
+        }
+        return false;
+    }
+    
+    bool operator>(const BigInt& other) const {
+        return other < *this;
+    }
+    
+    bool operator<=(const BigInt& other) const {
+        return !(other < *this);
+    }
+    
+    bool operator>=(const BigInt& other) const {
+        return !(*this < other);
+    }
+    
+    string toString() const {
+        if (digits.empty()) return "0";
+        char buf[20];
+        string result = to_string(digits.back());
+        for (int i = (int)digits.size() - 2; i >= 0; i--) {
+            sprintf(buf, "%09d", digits[i]);
+            result += buf;
+        }
+        return result;
+    }
+};
 
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-
+    
     int n, m;
-    cin >> n >> m;
-
-    vector<vector<int>> matrix(n, vector<int>(m));
+    if (!(cin >> n >> m)) {
+        return 0;
+    }
+    
+    vector<vector<int>> a(n, vector<int>(m));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < m; j++) {
-            cin >> matrix[i][j];
+            cin >> a[i][j];
         }
     }
-
-    vector<ll> pow2(m + 1);
-    pow2[0] = 1;
+    
+    vector<BigInt> pow2(m + 1);
+    pow2[0] = BigInt(1);
     for (int i = 1; i <= m; i++) {
-        pow2[i] = pow2[i - 1] * 2;
+        pow2[i] = pow2[i-1] * 2;
     }
-
-    ll totalScore = 0;
-
-    for (int i = 0; i < n; i++) {
-        vector<vector<ll>> dp(m, vector<ll>(m, 0));
-        for (int len = 1; len <= m; len++) {
-            for (int l = 0; l <= m - len; l++) {
+    
+    BigInt total;
+    
+    for (int row = 0; row < n; row++) {
+        vector<vector<BigInt>> dp(m, vector<BigInt>(m));
+        
+        for (int i = 0; i < m; i++) {
+            dp[i][i] = BigInt(a[row][i]) * pow2[m];
+        }
+        
+        for (int len = 2; len <= m; len++) {
+            for (int l = 0; l + len - 1 < m; l++) {
                 int r = l + len - 1;
-                int round = m - len + 1;
-                if (len == 1) {
-                    dp[l][r] = (ll)matrix[i][l] * pow2[round];
-                } else {
-                    ll takeLeft = (ll)matrix[i][l] * pow2[round] + dp[l + 1][r];
-                    ll takeRight = (ll)matrix[i][r] * pow2[round] + dp[l][r - 1];
-                    dp[l][r] = max(takeLeft, takeRight);
-                }
+                int k = m - (r - l);
+                
+                BigInt left = dp[l+1][r] + BigInt(a[row][l]) * pow2[k];
+                BigInt right = dp[l][r-1] + BigInt(a[row][r]) * pow2[k];
+                
+                dp[l][r] = (left > right) ? left : right;
             }
         }
-        totalScore += dp[0][m - 1];
+        
+        total += dp[0][m-1];
     }
-
-    print(totalScore);
-
+    
+    cout << total.toString() << endl;
+    
     return 0;
 }
